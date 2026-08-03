@@ -7,3 +7,6 @@ __pycache__/
 *.log
 *.out
 design/
+dbt/target/
+dbt/tcg.duckdb
+logs/

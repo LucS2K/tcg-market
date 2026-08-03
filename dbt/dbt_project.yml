@@ -1,0 +1,14 @@
+name: tcg_market
+version: "0.1.0"
+profile: tcg_market
+
+model-paths: ["models"]
+target-path: target
+clean-targets: [target, dbt_packages]
+
+models:
+  tcg_market:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

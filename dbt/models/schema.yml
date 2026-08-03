@@ -1,0 +1,60 @@
+version: 2
+
+models:
+  - name: stg_mtg_prices
+    description: Scryfall daily prices unpivoted to one row per (card, finish, currency).
+  - name: stg_pokemon_prices
+    description: >
+      pokemontcg.io daily prices. TCGplayer rows are per print variant
+      (USD, market falling back to mid); Cardmarket rows are card-level
+      (EUR, trend falling back to average sell).
+  - name: stg_tcgplayer_prices
+    description: tcgapi.dev daily prices for Lorcana, One Piece, and Riftbound (TCGplayer market data, USD).
+  - name: stg_cards
+    description: Reference extracts for all five games, unioned by name.
+
+  - name: dim_cards
+    description: One row per printing, with reprint_group_key linking printings of the same card.
+    columns:
+      - name: card_key
+        tests: [not_null, unique]
+      - name: reprint_group_key
+        tests: [not_null]
+      - name: game
+        tests:
+          - accepted_values:
+              values: [mtg, pokemon, lorcana, onepiece, riftbound]
+
+  - name: fct_daily_prices
+    description: One row per (card, day, source, finish, currency) price observation across all five games.
+    columns:
+      - name: card_key
+        tests: [not_null]
+      - name: snapshot_date
+        tests: [not_null]
+      - name: price
+        tests: [not_null]
+      - name: game
+        tests:
+          - accepted_values:
+              values: [mtg, pokemon, lorcana, onepiece, riftbound]
+
+  - name: reprint_lineage
+    description: >
+      Printing history per reprint group — the backbone of the reprint
+      decay analysis. Scope decided 2026-08-03: Riftbound is EXCLUDED
+      (no reprint history; its role is the raw time series). Lorcana is
+      INCLUDED as the fast-forward counterpart to Magic's decades-long
+      supply cycle (launch Aug 2023, aggressive reprints through 2024).
+      Named confound for Lorcana, stated but not modeled around:
+      first-year prices carried speculative Disney-collector demand
+      distinct from play demand.
+    columns:
+      - name: reprint_group_key
+        tests: [not_null, unique]
+      - name: n_printings
+        tests: [not_null]
+      - name: game
+        tests:
+          - accepted_values:
+              values: [mtg, pokemon, lorcana, onepiece]

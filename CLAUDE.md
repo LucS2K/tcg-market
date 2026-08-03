@@ -10,9 +10,16 @@ price decay.
 - Stage 1 (this stage): the collector. Daily snapshots from all sources,
   Parquet partitions in `data/`, scheduled GitHub Actions workflow,
   idempotent per date, loud failures.
-- Stage 2: dbt staging/marts models in `dbt/`, including the reprint
-  analysis. Not started.
-- Stage 3+: analysis and site. Not started.
+- Stage 2 (in progress): dbt project in `dbt/` on dbt-duckdb, run from
+  the repo root with `dbt build --project-dir dbt --profiles-dir dbt`.
+  Staging views normalize the three per-game price schemas into
+  `fct_daily_prices` (one row per card/day/source/finish/currency);
+  `dim_cards` assigns `reprint_group_key` (MTG: oracle_id; others:
+  game + lowercased name, a documented heuristic); `reprint_lineage`
+  aggregates printing history, excluding Riftbound per the roster
+  table. The decay analysis itself needs accumulated daily history.
+- Stage 3+: analysis and site. Not started. Design handoff for the site
+  ("Binder") lives untracked in `design/`.
 
 ## Roster: closed at five games
 

@@ -1,0 +1,11 @@
+# Local DuckDB over the committed Parquet partitions. Run from the repo
+# root: dbt build --project-dir dbt --profiles-dir dbt
+# (relative source paths resolve from the working directory, so always
+# invoke from the repo root).
+tcg_market:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: dbt/tcg.duckdb
+      threads: 4
