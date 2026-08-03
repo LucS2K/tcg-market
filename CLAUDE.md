@@ -1,0 +1,79 @@
+# tcg-market
+
+Daily price-tracking pipeline for trading card games. Raw price snapshots
+are collected once a day, stored as Parquet partitions committed to this
+repo, and (in stage 2) modeled with dbt to study how reprint policy shapes
+price decay.
+
+## Stage roadmap
+
+- Stage 1 (this stage): the collector. Daily snapshots from all sources,
+  Parquet partitions in `data/`, scheduled GitHub Actions workflow,
+  idempotent per date, loud failures.
+- Stage 2: dbt staging/marts models in `dbt/`, including the reprint
+  analysis. Not started.
+- Stage 3+: analysis and site. Not started.
+
+## Roster: closed at five games
+
+Magic, Pokemon, Lorcana, One Piece, Riftbound — one game per supply
+regime. Do not add more: additional games add collection and
+identity-mapping cost without adding a supply posture not already
+represented.
+
+| game key    | source           | stage 2 reprint analysis |
+|-------------|------------------|--------------------------|
+| `mtg`       | Scryfall bulk    | included (decades-long reprint history) |
+| `pokemon`   | pokemontcg.io    | included |
+| `lorcana`   | tcgapi.dev       | INCLUDED — full scarcity-shock-and-supply-response cycle compressed into ~3 years (launch Aug 2023, aggressive Ravensburger reprints through 2024). Confound to name in the analysis: first-year prices carried speculative Disney-collector demand distinct from play demand. State it, do not model around it. |
+| `onepiece`  | tcgapi.dev       | included |
+| `riftbound` | tcgapi.dev       | EXCLUDED — Riot's LoL TCG, launched late 2025, five sets as of mid-2026, zero reprints, hype-phase pricing. No reprint history, so it cannot contribute to the decay question. Its role is the time series: a new game's price behavior before any supply discipline exists, and the before/after series if Riot's first meaningful reprint lands while we are collecting. |
+
+## Data sources
+
+- MTG: Scryfall bulk data (`default_cards` file). No API key. Requires a
+  descriptive User-Agent and Accept header.
+- Pokemon: pokemontcg.io `/v2/cards`, paginated. `POKEMONTCG_API_KEY` env
+  var optional but raises rate limits; without it the collector paces
+  requests to stay under anonymous limits.
+- Lorcana / One Piece / Riftbound: tcgapi.dev free tier, `TCGAPI_KEY` env
+  var REQUIRED. Free tier is 100 requests/day shared across all three
+  games. Bulk export and set-level price endpoints are paid tiers; the
+  free-tier path is `/v1/sets?game=X` then `/v1/sets/:id/cards` paginated
+  at `per_page=100`, reading price fields off each card object.
+  Budget ~85 requests for a full three-game snapshot — which means a
+  reference refresh for these games CANNOT run on the same UTC day as a
+  snapshot. The collector counts requests and fails loudly on 429.
+
+## Data layout
+
+- Daily snapshots: `data/game=<game>/date=<YYYY-MM-DD>/prices.parquet`.
+  Price and identity fields only (card id + price columns). Game keys:
+  `mtg`, `pokemon`, `lorcana`, `onepiece`, `riftbound`.
+- Reference extract: `data/reference/game=<game>/cards.parquet`. Card
+  metadata that rarely changes: name, rarity, set, released_at, oracle_id
+  (or per-game equivalent), image URL column, artist. Refreshed on demand
+  via `workflow_dispatch`, never on the daily schedule.
+
+## Collector conventions
+
+- Idempotent per date: if a partition file already exists for the target
+  date, the collector skips that game (no rewrite, no diff). `--force`
+  overwrites.
+- Fail loudly: any source error logs a traceback and the run exits
+  non-zero. No silent partial success — but games that already wrote
+  their partition are skipped on re-run, so a failed run can be retried
+  and only the missing games are fetched.
+- Parquet files are written to a temp file and atomically renamed, so a
+  crash never leaves a corrupt partition.
+
+### Card imagery
+
+- Image URLs (Scryfall image_uris.normal, pokemontcg.io images.large, One
+  Piece equivalent) are captured as columns in the reference extract only.
+- Images are NEVER downloaded, stored in the repo, or written to Parquet.
+  The site hotlinks source CDNs lazily at view time.
+- Attribution: card images copyright their respective publishers (Wizards
+  of the Coast, The Pokemon Company, Bandai); the site footer carries the
+  fan-content attribution each source requires. Artist names are available
+  per card from Scryfall and should display where imagery displays.

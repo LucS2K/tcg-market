@@ -1,0 +1,46 @@
+name: refresh-reference
+
+# On demand only, never scheduled. For lorcana/onepiece/riftbound this
+# spends the shared tcgapi.dev 100 req/day budget — do not run those
+# games on the same UTC day as a snapshot.
+on:
+  workflow_dispatch:
+    inputs:
+      games:
+        description: "Space-separated games (empty = all): mtg pokemon lorcana onepiece riftbound"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collector
+  cancel-in-progress: false
+
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r collector/requirements.txt
+      - name: Refresh reference extract
+        run: python -m collector.reference ${{ inputs.games }}
+        env:
+          POKEMONTCG_API_KEY: ${{ secrets.POKEMONTCG_API_KEY }}
+          TCGAPI_KEY: ${{ secrets.TCGAPI_KEY }}
+      - name: Commit reference extract
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/reference
+          if git diff --cached --quiet; then
+            echo "no changes to commit"
+          else
+            git commit -m "reference refresh: $(date -u +%F)"
+            git pull --rebase origin main
+            git push
+          fi
