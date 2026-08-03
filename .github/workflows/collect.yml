@@ -47,3 +47,23 @@ jobs:
     permissions:
       contents: read
     secrets: inherit
+
+  alert-on-failure:
+    needs: [snapshot, deploy-site]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue unless one is already open for today
+        run: |
+          title="Daily pipeline failed: $(date -u +%F)"
+          if gh issue list --repo "$REPO" --state open --search "\"$title\" in:title" --json number --jq length | grep -qv '^0$'; then
+            echo "issue already open"
+          else
+            gh issue create --repo "$REPO" --title "$title" \
+              --body "Failed run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}

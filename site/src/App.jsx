@@ -1,15 +1,40 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GAMES } from "./theme.js";
 import { fmt, clickable } from "./format.js";
-import { getAllIndexes, getMeta } from "./data.js";
+import { getAllIndexes, getMeta, norm, alnum } from "./data.js";
+
+// Edit distance <= 1 (insert/delete/substitute), single pass.
+function nearMatch(a, b) {
+  if (a === b) return true;
+  const la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > 1) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < la && j < lb) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (la > lb) i++;
+    else if (lb > la) j++;
+    else { i++; j++; }
+  }
+  return edits + (la - i) + (lb - j) <= 1;
+}
 import Home from "./Home.jsx";
 import CardDetail from "./CardDetail.jsx";
 import About from "./About.jsx";
+import Browse from "./Browse.jsx";
 
 function viewFromHash() {
-  const m = window.location.hash.match(/^#\/card\/([0-9a-f]+)/);
+  const hash = window.location.hash;
+  const m = hash.match(/^#\/card\/([0-9a-f]+)/);
   if (m) return { t: "card", id: m[1] };
-  if (window.location.hash.startsWith("#/about")) return { t: "about" };
+  if (hash.startsWith("#/about")) return { t: "about" };
+  const b = hash.match(/^#\/browse\/(\w+)(?:\?(.*))?$/);
+  if (b) {
+    const game = GAMES[b[1]] ? b[1] : "mtg";
+    const params = new URLSearchParams(b[2] || "");
+    return { t: "browse", game, set: params.get("set") || null, page: Number(params.get("page")) || 1 };
+  }
+  if (hash.startsWith("#/browse")) return { t: "browse", game: "mtg", set: null, page: 1 };
   return { t: "home" };
 }
 
@@ -76,14 +101,28 @@ export default function App() {
   const query = q.trim().toLowerCase();
   const results = useMemo(() => {
     if (!query || !index) return [];
+    const nq = norm(query);
+    const cq = alnum(query);
     const scored = [];
     for (const e of index) {
-      const name = e.name.toLowerCase();
       let score = -1;
-      if (name.startsWith(query)) score = 2;
-      else if (name.includes(query)) score = 1.5;
-      else if ((e.set + " " + GAMES[e.game].name + " " + e.code).toLowerCase().includes(query)) score = 1;
+      if (e.norm.startsWith(nq)) score = 2;
+      else if (e.norm.includes(nq)) score = 1.5;
+      else if (cq.length >= 3 && e.codeNorm.includes(cq)) score = 1.2;
+      else if (norm(e.set + " " + GAMES[e.game].name).includes(nq)) score = 1;
       if (score > 0) scored.push({ e, score });
+    }
+    // Typo tolerance: token-level edit-distance-1 when exact matching
+    // comes up short ("sheoldrid" still finds Sheoldred).
+    if (scored.length < 6 && nq.length >= 4) {
+      const qTokens = nq.split(/[^a-z0-9]+/).filter(Boolean);
+      for (const e of index) {
+        if (e.norm.includes(nq)) continue;
+        const tokens = e.norm.split(/[^a-z0-9]+/);
+        if (qTokens.every((qt) => tokens.some((t) => nearMatch(qt, t)))) {
+          scored.push({ e, score: 0.5 });
+        }
+      }
     }
     scored.sort((a, b) => b.score - a.score || (b.e.price || 0) - (a.e.price || 0));
     return scored.slice(0, 6).map((x) => x.e);
@@ -130,6 +169,9 @@ export default function App() {
             </div>
           )}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <a href="#/browse/mtg" className="lift-btn" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 13, fontWeight: 700, color: "#241a45", textDecoration: "none", background: "#fff", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", whiteSpace: "nowrap", boxShadow: "2px 2px 0 #241a45" }}>
+              browse all
+            </a>
             <a href="#/about" className="lift-btn" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 13, fontWeight: 700, color: "#241a45", textDecoration: "none", background: "#ffe36a", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", whiteSpace: "nowrap", boxShadow: "2px 2px 0 #241a45" }}>
               about me
             </a>
@@ -142,6 +184,8 @@ export default function App() {
 
       {view.t === "about" ? (
         <About goHome={goHome} />
+      ) : view.t === "browse" ? (
+        <Browse game={view.game} set={view.set} page={view.page} openCard={openCard} />
       ) : isCard ? (
         <CardDetail key={view.id} gid={view.id} openCard={openCard} goHome={goHome} />
       ) : (

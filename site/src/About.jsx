@@ -84,7 +84,8 @@ export default function About({ goHome }) {
             <a href="https://www.linkedin.com/in/luchnguyen/">LinkedIn</a> ·{" "}
             <a href="https://github.com/LucS2K">GitHub</a> ·{" "}
             <a href="mailto:ljr.luc.nguyen@gmail.com">ljr.luc.nguyen@gmail.com</a> ·{" "}
-            <a href="https://github.com/LucS2K/tcg-market">source code</a>
+            <a href="https://github.com/LucS2K/tcg-market">source code</a> ·{" "}
+            <a href="/dbt-docs/">model docs</a>
           </p>
         </section>
       </div>

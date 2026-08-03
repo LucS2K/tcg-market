@@ -35,6 +35,11 @@ jobs:
       - run: pip install -r dbt/requirements.txt
       - run: dbt build --project-dir dbt --profiles-dir dbt
       - run: python scripts/export_site_data.py
+      - name: Publish dbt docs into the site
+        run: |
+          dbt docs generate --project-dir dbt --profiles-dir dbt --static
+          mkdir -p site/public/dbt-docs
+          cp dbt/target/static_index.html site/public/dbt-docs/index.html
       - uses: actions/setup-node@v4
         with:
           node-version: 22

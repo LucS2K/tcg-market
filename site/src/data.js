@@ -20,6 +20,18 @@ export function getSets() {
   return getJson("sets.json");
 }
 
+export const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+export const alnum = (s) => norm(s).replace(/[^a-z0-9]/g, "");
+
+function mapEntry(e, game) {
+  return {
+    gid: e[0], name: e[1], set: e[2], code: e[3], rarity: e[4], price: e[5], change: e[6],
+    game,
+    norm: norm(e[1]),
+    codeNorm: alnum(e[3]),
+  };
+}
+
 // Search index entry: [gid, name, set, code, rarity, price, change]
 export async function getAllIndexes() {
   const meta = await getMeta();
@@ -29,7 +41,7 @@ export async function getAllIndexes() {
   );
   const out = [];
   games.forEach((g, i) => {
-    for (const e of lists[i]) out.push({ gid: e[0], name: e[1], set: e[2], code: e[3], rarity: e[4], price: e[5], change: e[6], game: g });
+    for (const e of lists[i]) out.push(mapEntry(e, g));
   });
   return out;
 }
@@ -37,7 +49,7 @@ export async function getAllIndexes() {
 export async function getIndex(game) {
   indexCache[game] ??= getJson(`index-${game}.json`);
   const list = await indexCache[game];
-  return list.map((e) => ({ gid: e[0], name: e[1], set: e[2], code: e[3], rarity: e[4], price: e[5], change: e[6], game }));
+  return list.map((e) => mapEntry(e, game));
 }
 
 async function getShard(gid) {
