@@ -1,1 +1,3 @@
 dbt-duckdb>=1.9
+# MotherDuck lags new DuckDB releases; 1.5.5 is not yet supported.
+duckdb==1.5.4

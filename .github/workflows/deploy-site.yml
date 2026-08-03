@@ -35,10 +35,6 @@ jobs:
       - run: pip install -r dbt/requirements.txt
       - run: dbt build --project-dir dbt --profiles-dir dbt
       - run: python scripts/export_site_data.py
-      - name: Mirror marts to MotherDuck
-        run: dbt build --project-dir dbt --profiles-dir dbt --target md
-        env:
-          motherduck_token: ${{ secrets.MOTHERDUCK_TOKEN }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -53,3 +49,9 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      # Last on purpose: a MotherDuck hiccup should page us (red run)
+      # without blocking the site deploy.
+      - name: Mirror marts to MotherDuck
+        run: dbt build --project-dir dbt --profiles-dir dbt --target md
+        env:
+          motherduck_token: ${{ secrets.MOTHERDUCK_TOKEN }}
