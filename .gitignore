@@ -10,3 +10,4 @@ design/
 dbt/target/
 dbt/tcg.duckdb
 logs/
+dbt/.user.yml
