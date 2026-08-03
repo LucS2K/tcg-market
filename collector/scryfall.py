@@ -1,6 +1,8 @@
 """MTG via Scryfall bulk data (default_cards): daily prices + reference."""
 from __future__ import annotations
 
+import gzip
+import json
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -77,12 +79,25 @@ def ref_row(card: dict) -> dict:
 def iter_bulk_cards(session: requests.Session) -> Iterator[dict]:
     meta = session.get(BULK_META_URL, timeout=(10, 60))
     meta.raise_for_status()
-    download_uri = meta.json()["download_uri"]
-    log.info("mtg: streaming scryfall bulk %s", download_uri)
-    resp = session.get(download_uri, stream=True, timeout=(10, 600))
+    info = meta.json()
+    # Scryfall migrated bulk files from a JSON array (download_uri) to
+    # gzipped JSONL (jsonl_download_uri); support both.
+    jsonl_uri = info.get("jsonl_download_uri")
+    array_uri = info.get("download_uri")
+    uri = jsonl_uri or array_uri
+    if not uri:
+        raise RuntimeError(f"scryfall bulk meta has no download uri (keys: {sorted(info)})")
+    log.info("mtg: streaming scryfall bulk %s", uri)
+    resp = session.get(uri, stream=True, timeout=(10, 600))
     resp.raise_for_status()
-    resp.raw.decode_content = True
-    yield from ijson.items(resp.raw, "item")
+    if jsonl_uri:
+        with gzip.open(resp.raw, mode="rt", encoding="utf-8") as stream:
+            for line in stream:
+                if line.strip():
+                    yield json.loads(line)
+    else:
+        resp.raw.decode_content = True
+        yield from ijson.items(resp.raw, "item")
 
 
 def collect_prices(session: requests.Session, out_path: Path) -> None:

@@ -36,14 +36,19 @@ represented.
 - Pokemon: pokemontcg.io `/v2/cards`, paginated. `POKEMONTCG_API_KEY` env
   var optional but raises rate limits; without it the collector paces
   requests to stay under anonymous limits.
-- Lorcana / One Piece / Riftbound: tcgapi.dev free tier, `TCGAPI_KEY` env
-  var REQUIRED. Free tier is 100 requests/day shared across all three
-  games. Bulk export and set-level price endpoints are paid tiers; the
-  free-tier path is `/v1/sets?game=X` then `/v1/sets/:id/cards` paginated
-  at `per_page=100`, reading price fields off each card object.
-  Budget ~85 requests for a full three-game snapshot — which means a
-  reference refresh for these games CANNOT run on the same UTC day as a
-  snapshot. The collector counts requests and fails loudly on 429.
+- Lorcana / One Piece / Riftbound: tcgapi.dev Hobby tier ($9.99/mo,
+  1,000 requests/day account-wide, resets midnight UTC), `TCGAPI_KEY`
+  env var REQUIRED. Set-level price dumps and bulk export are higher
+  tiers, so the path is `/v1/sets?game=X` then `/v1/sets/:id/cards`
+  paginated at `per_page=100`, reading price fields off each card
+  object. Measured cost: ~190 requests for a full three-game snapshot
+  (Lorcana 20 sets ≈ 49, One Piece 83 sets ≈ 122, Riftbound 8 sets ≈ 19),
+  so a snapshot and a reference refresh fit in the same day with room to
+  spare. The free tier (100/day) does NOT fit — the roster's floor is
+  ≥1 request per set ≈ 113/day. The collector counts requests and fails
+  loudly on 429. Hobby also includes 7-day price history, but it is
+  per-card (~11.7k cards ≈ 12 days of budget per full pull), so it is a
+  spot-check/gap-repair tool only, not a collection path.
 
 ## Data layout
 

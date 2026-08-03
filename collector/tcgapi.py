@@ -1,11 +1,12 @@
-"""Lorcana / One Piece / Riftbound via tcgapi.dev free tier.
+"""Lorcana / One Piece / Riftbound via tcgapi.dev (Hobby tier).
 
-Free tier: X-API-Key required, 100 requests/day shared across all three
-games. Bulk export and set-level price endpoints are paid tiers, so the
-free path is /v1/sets?game=X then /v1/sets/:id/cards at per_page=100,
-reading price fields off each card object (~85 requests for a full
-three-game snapshot). The client counts every request and a 429 aborts
-the run immediately instead of retrying.
+X-API-Key required; Hobby tier allows 1,000 requests/day account-wide
+(resets midnight UTC). Set-level price dumps and bulk export are higher
+tiers, so the path is /v1/sets?game=X then /v1/sets/:id/cards at
+per_page=100, reading price fields off each card object (~190 requests
+for a full three-game snapshot; the roster does not fit the free tier's
+100/day). The client counts every request and a 429 aborts the run
+immediately instead of retrying.
 """
 from __future__ import annotations
 
@@ -81,7 +82,7 @@ class TcgApiClient:
         if resp.status_code == 429:
             raise RuntimeError(
                 f"tcgapi.dev returned 429 (daily cap) after {self.requests_made} "
-                "requests this run; snapshot and reference refresh cannot share a day"
+                "requests this run; cap resets at midnight UTC"
             )
         resp.raise_for_status()
         return resp.json()

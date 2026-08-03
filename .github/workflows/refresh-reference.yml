@@ -1,8 +1,7 @@
 name: refresh-reference
 
 # On demand only, never scheduled. For lorcana/onepiece/riftbound this
-# spends the shared tcgapi.dev 100 req/day budget — do not run those
-# games on the same UTC day as a snapshot.
+# spends ~190 requests of the shared tcgapi.dev 1,000/day budget.
 on:
   workflow_dispatch:
     inputs:

@@ -3,9 +3,9 @@
     python -m collector.reference [games...]
 
 Always overwrites data/reference/game=<game>/cards.parquet for the
-selected games. NOTE: for lorcana/onepiece/riftbound this uses the same
-tcgapi.dev request budget as the daily snapshot (~85 requests for all
-three), so do not refresh those games on the same UTC day as a snapshot.
+selected games. For lorcana/onepiece/riftbound this spends ~190
+tcgapi.dev requests (same crawl as the daily snapshot) from the shared
+1,000/day Hobby-tier budget.
 """
 from __future__ import annotations
 
