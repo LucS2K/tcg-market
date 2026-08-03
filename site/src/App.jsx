@@ -129,8 +129,13 @@ export default function App() {
               )}
             </div>
           )}
-          <div style={{ marginLeft: "auto", fontFamily: "'Spline Sans Mono', monospace", fontSize: 11, background: "#fff", border: "2px solid #241a45", borderRadius: 999, padding: "5px 12px", whiteSpace: "nowrap" }}>
-            real data · {meta ? meta.snapshot_date : "refreshed daily"}
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <a href="#/about" className="lift-btn" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 13, fontWeight: 700, color: "#241a45", textDecoration: "none", background: "#ffe36a", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", whiteSpace: "nowrap", boxShadow: "2px 2px 0 #241a45" }}>
+              about me
+            </a>
+            <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 11, background: "#fff", border: "2px solid #241a45", borderRadius: 999, padding: "5px 12px", whiteSpace: "nowrap" }}>
+              real data · {meta ? meta.snapshot_date : "refreshed daily"}
+            </div>
           </div>
         </div>
       </header>
