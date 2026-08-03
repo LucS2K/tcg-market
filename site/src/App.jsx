@@ -22,6 +22,9 @@ import Home from "./Home.jsx";
 import CardDetail from "./CardDetail.jsx";
 import About from "./About.jsx";
 import Browse from "./Browse.jsx";
+import BinderPage from "./BinderPage.jsx";
+import Analysis from "./Analysis.jsx";
+import { binderSize, onBinderChange } from "./binder.js";
 
 function viewFromHash() {
   const hash = window.location.hash;
@@ -35,6 +38,10 @@ function viewFromHash() {
     return { t: "browse", game, set: params.get("set") || null, page: Number(params.get("page")) || 1 };
   }
   if (hash.startsWith("#/browse")) return { t: "browse", game: "mtg", set: null, page: 1 };
+  if (hash.startsWith("#/sealed")) return { t: "sealed" };
+  const bm = hash.match(/^#\/binder(?:\?(.*))?$/);
+  if (bm) return { t: "binder", code: new URLSearchParams(bm[1] || "").get("code") };
+  if (hash.startsWith("#/analysis")) return { t: "analysis" };
   return { t: "home" };
 }
 
@@ -70,6 +77,8 @@ export default function App() {
   const [gameFilter, setGameFilter] = useState("all");
   const [meta, setMeta] = useState(null);
   const [index, setIndex] = useState(null);
+  const [binderN, setBinderN] = useState(() => binderSize());
+  useEffect(() => onBinderChange((b) => setBinderN(binderSize(b))), []);
   const indexLoading = useRef(false);
   const resultsRef = useRef([]);
 
@@ -172,6 +181,12 @@ export default function App() {
             <a href="#/browse/mtg" className="lift-btn" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 13, fontWeight: 700, color: "#241a45", textDecoration: "none", background: "#fff", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", whiteSpace: "nowrap", boxShadow: "2px 2px 0 #241a45" }}>
               browse all
             </a>
+            <a href="#/sealed" className="lift-btn" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 13, fontWeight: 700, color: "#241a45", textDecoration: "none", background: "#fff", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", whiteSpace: "nowrap", boxShadow: "2px 2px 0 #241a45" }}>
+              sealed
+            </a>
+            <a href="#/binder" className="lift-btn" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 13, fontWeight: 700, color: "#fff6ea", textDecoration: "none", background: "#ff5470", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", whiteSpace: "nowrap", boxShadow: "2px 2px 0 #241a45" }}>
+              binder{binderN > 0 ? ` · ${binderN}` : ""}
+            </a>
             <a href="#/about" className="lift-btn" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 13, fontWeight: 700, color: "#241a45", textDecoration: "none", background: "#ffe36a", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", whiteSpace: "nowrap", boxShadow: "2px 2px 0 #241a45" }}>
               about me
             </a>
@@ -186,6 +201,12 @@ export default function App() {
         <About goHome={goHome} />
       ) : view.t === "browse" ? (
         <Browse game={view.game} set={view.set} page={view.page} openCard={openCard} />
+      ) : view.t === "sealed" ? (
+        <Browse game="mtg" set={null} page={1} openCard={openCard} sealed />
+      ) : view.t === "binder" ? (
+        <BinderPage sharedCode={view.code} openCard={openCard} goHome={goHome} />
+      ) : view.t === "analysis" ? (
+        <Analysis goHome={goHome} />
       ) : isCard ? (
         <CardDetail key={view.id} gid={view.id} openCard={openCard} goHome={goHome} />
       ) : (
@@ -205,6 +226,7 @@ export default function App() {
           <div style={{ fontWeight: 800, fontSize: 17 }}>✦ NeighborsTCG</div>
           <div style={{ fontSize: 13, color: "#b8aee0", maxWidth: 640, lineHeight: 1.5 }}>
             A hobby project tracking daily market prices. Card names, sets, and images belong to their publishers — Wizards of the Coast, The Pokémon Company, Bandai, Ravensburger &amp; Disney, and Riot Games. Unofficial fan content; not affiliated with or endorsed by any of them. Prices via Scryfall, pokemontcg.io, and TCGplayer market data.{" "}
+            <a href="#/analysis" style={{ color: "#fff6ea", fontWeight: 700 }}>Do reprints kill prices? →</a>{" "}
             <a href="#/about" style={{ color: "#fff6ea", fontWeight: 700 }}>About this site →</a>
           </div>
         </div>

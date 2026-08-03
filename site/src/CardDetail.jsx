@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { GAMES, COPY, pillFg } from "./theme.js";
-import { fmt, changeStr, clickable, sparkPts } from "./format.js";
-import { getCard, getCards } from "./data.js";
+import { fmt, changeStr, clickable, sparkPts, datePts } from "./format.js";
+import { getCard, getCards, getHistory } from "./data.js";
+import { getQty, setQty } from "./binder.js";
 
 export default function CardDetail({ gid, openCard, goHome }) {
   const [card, setCard] = useState(null);
@@ -9,10 +10,20 @@ export default function CardDetail({ gid, openCard, goHome }) {
   const [flipped, setFlipped] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
   const [error, setError] = useState(false);
+  const [range, setRange] = useState("12w");
+  const [hist, setHist] = useState(null);
+  const [owned, setOwned] = useState(0);
+  useEffect(() => { setOwned(getQty(gid)); }, [gid]);
+  const changeOwned = (delta) => {
+    const next = Math.max(0, owned + delta);
+    setQty(gid, next);
+    setOwned(next);
+  };
 
   useEffect(() => {
     let live = true;
     setCard(null); setRelated([]); setFlipped(false); setImgIdx(0); setError(false);
+    setRange("12w"); setHist(null);
     getCard(gid)
       .then((c) => {
         if (!live) return;
@@ -44,15 +55,33 @@ export default function CardDetail({ gid, openCard, goHome }) {
   // the base-name card (same illustration for most promo variants).
   const artSrcs = card.images?.length ? card.images : card.image ? [card.image] : [];
   const artSrc = imgIdx < artSrcs.length ? artSrcs[imgIdx] : null;
+
+  const pickRange = (r) => {
+    setRange(r);
+    if (r !== "12w" && hist === null) {
+      getHistory(gid).then(setHist).catch(() => setHist([]));
+    }
+  };
   const up = (card.change ?? 0) >= 0;
   const cs = changeStr(card.change);
   const spark = card.spark?.length ? card.spark : [card.price];
-  const hi = Math.max(...spark), lo = Math.min(...spark);
-  const chartPts = sparkPts(spark, 560, 170, 10);
-  const sparkColor = up ? "#17a34a" : "#e14545";
-  const sparkFill = up ? "rgba(23,163,74,.14)" : "rgba(225,69,69,.12)";
-  const maxCond = Math.max(...card.conditions.map((x) => x[1]));
+
+  let series = null; // dated pairs for 1y/all, null for 12w spark mode
+  if (range !== "12w" && hist?.length) {
+    const maxDay = hist[hist.length - 1][0];
+    series = range === "1y" ? hist.filter(([d]) => d > maxDay - 365) : hist;
+  }
+  const activePrices = series ? series.map((p) => p[1]) : spark;
+  const hi = Math.max(...activePrices), lo = Math.min(...activePrices);
+  const chartPts = series ? datePts(series, 560, 170, 10) : sparkPts(spark, 560, 170, 10);
+  const rangeUp = activePrices[activePrices.length - 1] >= activePrices[0];
+  const sparkColor = rangeUp ? "#17a34a" : "#e14545";
+  const sparkFill = rangeUp ? "rgba(23,163,74,.14)" : "rgba(225,69,69,.12)";
+  const maxCond = card.conditions.length ? Math.max(...card.conditions.map((x) => x[1])) : 0;
   const weeksOfHistory = spark.length;
+  const rangeLabel = range === "12w"
+    ? (weeksOfHistory >= 12 ? "Last 12 weeks" : "Price history so far")
+    : range === "1y" ? "Last year" : "All tracked history";
 
   return (
     <main style={{ maxWidth: 1160, margin: "0 auto", padding: "26px 20px 60px", width: "100%", boxSizing: "border-box" }}>
@@ -99,16 +128,47 @@ export default function CardDetail({ gid, openCard, goHome }) {
               <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 13, fontWeight: 700, padding: "5px 12px", borderRadius: 999, border: "2px solid #241a45", background: "#fff", color: "#7c6fa8", marginBottom: 6 }}>7d trend soon</div>
             )}
           </div>
+          {card.eur != null && (
+            <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 13, color: "#7c6fa8", marginTop: 6 }}>
+              ≈ €{card.eur.toFixed(2)} EU market (Cardmarket)
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+            {owned === 0 ? (
+              <button className="lift-btn" onClick={() => changeOwned(1)} style={{ fontSize: 14, fontWeight: 700, padding: "8px 16px", borderRadius: 999, border: "2px solid #241a45", background: "#ff5470", color: "#fff6ea", cursor: "pointer", boxShadow: "3px 3px 0 #241a45" }}>
+                + add to binder
+              </button>
+            ) : (
+              <>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#7c6fa8" }}>in your binder:</span>
+                <button className="lift-btn" onClick={() => changeOwned(-1)} style={{ width: 30, height: 30, borderRadius: 999, border: "2px solid #241a45", background: "#fff", cursor: "pointer", fontWeight: 800 }}>−</button>
+                <span style={{ fontFamily: "'Spline Sans Mono', monospace", fontWeight: 700 }}>{owned}</span>
+                <button className="lift-btn" onClick={() => changeOwned(1)} style={{ width: 30, height: 30, borderRadius: 999, border: "2px solid #241a45", background: "#fff", cursor: "pointer", fontWeight: 800 }}>+</button>
+                <a href="#/binder" style={{ fontSize: 13, fontWeight: 700 }}>view binder →</a>
+              </>
+            )}
+          </div>
 
           <div style={{ background: "#fff", border: "2px solid #241a45", borderRadius: 18, boxShadow: "4px 4px 0 #241a45", padding: 18, marginTop: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>{weeksOfHistory >= 12 ? "Last 12 weeks" : "Price history so far"}</div>
-              <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 12, color: "#7c6fa8" }}>high {fmt(hi)} · low {fmt(lo)}</div>
+              <div style={{ fontWeight: 800, fontSize: 15 }}>{rangeLabel}</div>
+              <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+                {[["12w", "12w"], ["1y", "1y"], ["all", "all"]].map(([id, label]) => (
+                  <button key={id} onClick={() => pickRange(id)} style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, border: "1.5px solid #241a45", cursor: "pointer", background: range === id ? "#241a45" : "#fff", color: range === id ? "#fff6ea" : "#241a45" }}>{label}</button>
+                ))}
+                <span style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 12, color: "#7c6fa8", marginLeft: 6 }}>high {fmt(hi)} · low {fmt(lo)}</span>
+              </div>
             </div>
             <svg viewBox="0 0 560 170" preserveAspectRatio="none" style={{ width: "100%", height: 170, display: "block", marginTop: 10 }}>
               <polygon points={chartPts + " 560,170 0,170"} fill={sparkFill} />
               <polyline points={chartPts} fill="none" stroke={sparkColor} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
+            {range !== "12w" && hist === null && (
+              <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 12, color: "#7c6fa8", marginTop: 6 }}>fetching the long view…</div>
+            )}
+            {range === "all" && (
+              <div style={{ fontFamily: "'Spline Sans Mono', monospace", fontSize: 11, color: "#7c6fa8", marginTop: 6 }}>weekly readings before the last 12 weeks · tracked since Feb 2024 at the earliest</div>
+            )}
           </div>
 
           <div style={{ background: "#fdf0f3", border: "2px solid #241a45", borderRadius: 18, padding: "18px 20px", marginTop: 18 }}>
@@ -147,6 +207,7 @@ export default function CardDetail({ gid, openCard, goHome }) {
       </section>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 40, marginTop: 52, animation: "rise .5s ease .16s both" }}>
+        {card.conditions.length > 0 && (
         <section style={{ flex: "1 1 400px", minWidth: 300 }}>
           <h2 style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 800, letterSpacing: "-1px", margin: "0 0 4px" }}>{COPY.condTitle}</h2>
           <div style={{ color: "#6e6396", fontSize: 14, marginBottom: 18 }}>{COPY.condSub}</div>
@@ -162,6 +223,7 @@ export default function CardDetail({ gid, openCard, goHome }) {
             ))}
           </div>
         </section>
+        )}
 
         <section style={{ flex: "1 1 400px", minWidth: 300 }}>
           <h2 style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 800, letterSpacing: "-1px", margin: "0 0 4px" }}>{COPY.relTitle}</h2>

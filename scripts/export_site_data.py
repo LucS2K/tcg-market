@@ -78,6 +78,110 @@ def tag_for(released: dt.date | None, today: dt.date) -> str:
     return "Recent"
 
 
+def write_analysis(con, out: Path) -> None:
+    """Preliminary stage-4 aggregates for the analysis page.
+
+    Market index: median monthly price of a fixed basket (cards priced
+    in the game's first observed month AND the latest month), normalized
+    to 100 at the start — composition never shifts, so the line means
+    something. Decay curves: for reprint events in the observed window
+    (a group gaining a new printing when an older one already existed),
+    the median trajectory of the ORIGINAL printing's price, normalized
+    to its pre-reprint level, by week relative to the reprint release.
+    """
+    index_rows = con.sql("""
+        with monthly as (
+            select game, card_key, date_trunc('month', snapshot_date) as m, median(price) as p
+            from fct_daily_prices
+            where currency = 'USD' and isodow(snapshot_date) = 4
+              and finish in ('nonfoil', 'normal', 'holofoil')
+            group by all
+        ),
+        bounds as (
+            select game, min(m) as g_min, max(m) as g_max from monthly group by game
+        ),
+        basket as (
+            select mo.game, mo.card_key
+            from monthly mo join bounds b using (game)
+            group by mo.game, mo.card_key, b.g_min, b.g_max
+            having min(mo.m) = b.g_min and max(mo.m) = b.g_max
+        )
+        select mo.game, strftime(mo.m, '%Y-%m'), median(mo.p), count(distinct mo.card_key)
+        from monthly mo join basket ba using (game, card_key)
+        group by mo.game, mo.m
+        order by mo.game, mo.m
+    """).fetchall()
+    index: dict[str, list] = defaultdict(list)
+    basket_n: dict[str, int] = {}
+    for game, month, med, n in index_rows:
+        index[game].append([month, float(med)])
+        basket_n[game] = max(basket_n.get(game, 0), int(n))
+    for series in index.values():
+        base = series[0][1] or 1
+        for pt in series:
+            pt[1] = round(pt[1] / base * 100, 1)
+
+    decay_rows = con.sql("""
+        with events as (
+            select d.reprint_group_key, d.game, min(d.released_at) as reprint_date
+            from dim_cards d
+            join reprint_lineage rl using (reprint_group_key)
+            where d.product_type != 'Sealed Products'
+              and d.released_at >= date '2024-05-01'
+              and d.released_at <= (select max(snapshot_date) - 60 from fct_daily_prices)
+              and rl.first_released < date '2024-02-08'
+            group by d.reprint_group_key, d.game
+        ),
+        orig as (
+            select reprint_group_key, min_by(card_key, released_at) as orig_key
+            from dim_cards
+            where product_type != 'Sealed Products'
+            group by reprint_group_key
+        ),
+        px as (
+            select e.game, e.reprint_group_key,
+                   datediff('day', e.reprint_date, f.snapshot_date) as rel,
+                   f.price
+            from events e
+            join orig o using (reprint_group_key)
+            join fct_daily_prices f on f.card_key = o.orig_key
+            where f.currency = 'USD'
+              and f.finish in ('nonfoil', 'normal', 'holofoil')
+              and abs(datediff('day', e.reprint_date, f.snapshot_date)) <= 120
+              and isodow(f.snapshot_date) = 4
+        ),
+        base as (
+            select game, reprint_group_key, median(price) as bp
+            from px where rel between -35 and -7
+            group by all
+            having median(price) >= 0.5
+        ),
+        norm as (
+            select p.game, p.reprint_group_key,
+                   cast(floor(p.rel / 7) as int) as wk,
+                   median(p.price / b.bp) as ratio
+            from px p join base b using (game, reprint_group_key)
+            group by all
+        )
+        select game, wk, round(median(ratio), 3), count(distinct reprint_group_key)
+        from norm
+        group by game, wk
+        order by game, wk
+    """).fetchall()
+    decay: dict[str, list] = defaultdict(list)
+    events_n: dict[str, int] = {}
+    for game, wk, ratio, n in decay_rows:
+        decay[game].append([int(wk), float(ratio), int(n)])
+        events_n[game] = max(events_n.get(game, 0), int(n))
+
+    (out / "analysis.json").write_text(json.dumps({
+        "index": index,
+        "basket_n": basket_n,
+        "decay": decay,
+        "events_n": events_n,
+    }, separators=(",", ":")), encoding="utf-8")
+
+
 def main() -> None:
     con = duckdb.connect(str(REPO_ROOT / "dbt" / "tcg.duckdb"), read_only=True)
     today = dt.date.today()
@@ -120,10 +224,13 @@ def main() -> None:
     """)
 
     # Spark history per printing: weekly-ish sample of the last 84 days.
-    # History follows the same finish as the headline price so charts
-    # never mix foil and non-foil readings.
-    spark_rows = con.sql("""
-        select f.card_key, f.snapshot_date, f.price
+    # Full dated history per card, following the headline finish so
+    # charts never mix foil and non-foil readings. Daily resolution for
+    # the last 84 days, weekly (Thursdays — the backfill's sample day)
+    # beyond that. Dates encode as days since EPOCH.
+    hist_rows = con.sql("""
+        select f.card_key,
+               list_sort(list([cast(datediff('day', date '2024-01-01', f.snapshot_date) as double), f.price]))
         from (
             select *, row_number() over (
                 partition by card_key, snapshot_date, finish
@@ -131,15 +238,30 @@ def main() -> None:
             ) as rn
             from fct_daily_prices
             where currency = 'USD'
-              and snapshot_date > (select max(snapshot_date) - 84 from fct_daily_prices)
+              and (snapshot_date > (select max(snapshot_date) - 84 from fct_daily_prices)
+                   or isodow(snapshot_date) = 4)
         ) f
         join latest l on l.card_key = f.card_key and l.finish = f.finish
         where f.rn = 1
-        order by f.card_key, f.snapshot_date
+        group by f.card_key
     """).fetchall()
-    history: dict[str, list[float]] = defaultdict(list)
-    for card_key, _d, price in spark_rows:
-        history[card_key].append(round(price, 2))
+    history: dict[str, list] = {
+        card_key: [[int(d), round(p, 2)] for d, p in pts]
+        for card_key, pts in hist_rows
+    }
+
+    con.execute(f"""
+        create temp table latest_eur as
+        select card_key, price
+        from (
+            select *, row_number() over (
+                partition by card_key
+                order by snapshot_date desc, {FINISH_RANK}, price desc
+            ) as rn
+            from fct_daily_prices
+            where currency = 'EUR'
+        ) where rn = 1
+    """)
 
     cards = con.sql("""
         select
@@ -148,18 +270,20 @@ def main() -> None:
             d.image_url, d.artist,
             l.price,
             w.price as week_ago_price,
-            rl.n_printings
+            rl.n_printings,
+            d.product_type,
+            e.price as eur_price
         from dim_cards d
         join latest l on l.card_key = d.card_key
         left join week_ago w on w.card_key = d.card_key and w.finish = l.finish
         left join reprint_lineage rl on rl.reprint_group_key = d.reprint_group_key
+        left join latest_eur e on e.card_key = d.card_key
         where d.name is not null
-          and d.product_type != 'Sealed Products'
     """).fetchall()
     columns = [
         "group_key", "game", "card_key", "card_id", "name", "number", "rarity",
         "set_code", "set_name", "released_at", "image_url", "artist", "price",
-        "week_ago_price", "n_printings",
+        "week_ago_price", "n_printings", "product_type", "eur_price",
     ]
 
     groups: dict[str, list[dict]] = defaultdict(list)
@@ -181,14 +305,18 @@ def main() -> None:
                 name_images[key].append(rec["image_url"])
 
     index_by_game: dict[str, list] = defaultdict(list)
+    sealed_entries: list = []
     shards: dict[int, dict] = defaultdict(dict)
+    hist_shards: dict[int, dict] = defaultdict(dict)
     detail_by_gid: dict[str, dict] = {}
+    max_day = con.sql("select datediff('day', date '2024-01-01', max(snapshot_date)) from fct_daily_prices").fetchone()[0]
 
     for group_key, printings in groups.items():
         printings.sort(key=lambda r: (r["released_at"] or dt.date.min, r["price"] or 0), reverse=True)
         head = printings[0]
         gid = gid_for(group_key)
         game = head["game"]
+        sealed = head["product_type"] == "Sealed Products"
         price = round(head["price"], 2)
         change = None
         if head["week_ago_price"]:
@@ -199,7 +327,9 @@ def main() -> None:
             if 0.1 <= ratio <= 10:
                 change = round((ratio - 1) * 100, 1)
 
-        spark = history.get(head["card_key"], [price])
+        hist = history.get(head["card_key"]) or [[max_day, price]]
+        recent = [p for d, p in hist if d > max_day - 84]
+        spark = recent or [price]
         if len(spark) > SPARK_POINTS:
             step = len(spark) / SPARK_POINTS
             spark = [spark[int(i * step)] for i in range(SPARK_POINTS - 1)] + [spark[-1]]
@@ -207,9 +337,14 @@ def main() -> None:
         code = f"{(head['set_code'] or '').upper()} · {head['number'] or '?'}"
         n_printings = int(head["n_printings"] or len(printings))
 
-        index_by_game[game].append([
-            gid, head["name"], head["set_name"], code, head["rarity"] or "", price, change,
-        ])
+        if sealed:
+            sealed_entries.append([
+                gid, head["name"], head["set_name"], code, head["rarity"] or "", price, change, game,
+            ])
+        else:
+            index_by_game[game].append([
+                gid, head["name"], head["set_name"], code, head["rarity"] or "", price, change,
+            ])
 
         ladder = CONDITION_LADDERS["pokemon"] if game == "pokemon" else CONDITION_LADDERS["default"]
         detail = {
@@ -220,6 +355,8 @@ def main() -> None:
             "code": code,
             "rarity": head["rarity"] or "",
             "price": price,
+            "eur": round(head["eur_price"], 2) if head["eur_price"] is not None else None,
+            "sealed": sealed,
             "change": change,
             "spark": spark,
             "image": head["image_url"],
@@ -242,17 +379,21 @@ def main() -> None:
                 }
                 for p in reversed(printings)  # oldest first on the timeline
             ],
-            "conditions": [[label, round(price * mult, 2)] for label, mult in ladder],
+            "conditions": [] if sealed else [[label, round(price * mult, 2)] for label, mult in ladder],
         }
         detail_by_gid[gid] = detail
         shards[shard_for(gid)][gid] = detail
+        # Full dated history ships in parallel shards, fetched only when
+        # a longer chart range is requested — keeps card pages light.
+        hist_shards[shard_for(gid)][gid] = hist
 
-    # Related: nearest-priced groups in the same game and set.
+    # Related: nearest-priced groups in the same game and set; sealed
+    # products relate to sealed products.
     by_set: dict[tuple, list] = defaultdict(list)
     for gid, det in detail_by_gid.items():
-        by_set[(det["game"], det["set"])].append((det["price"], gid))
+        by_set[(det["game"], det["set"], det["sealed"])].append((det["price"], gid))
     for det in detail_by_gid.values():
-        pool = sorted(by_set[(det["game"], det["set"])])
+        pool = by_set[(det["game"], det["set"], det["sealed"])]
         me = det["id"]
         ranked = sorted(pool, key=lambda t: abs(t[0] - det["price"]))
         det["related"] = [g for _p, g in ranked if g != me][:3]
@@ -286,7 +427,10 @@ def main() -> None:
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "num_shards": NUM_SHARDS,
         "games": sorted(index_by_game),
+        "epoch": "2024-01-01",
     }), encoding="utf-8")
+    sealed_entries.sort(key=lambda e: -(e[5] or 0))
+    (out / "sealed.json").write_text(json.dumps(sealed_entries, separators=(",", ":")), encoding="utf-8")
     (out / "sets.json").write_text(json.dumps(sets_out), encoding="utf-8")
     for game, entries in index_by_game.items():
         entries.sort(key=lambda e: -(e[5] or 0))
@@ -328,6 +472,11 @@ def main() -> None:
     (out / "trending.json").write_text(json.dumps(trending, separators=(",", ":")), encoding="utf-8")
     for shard_id, payload in shards.items():
         (out / "cards" / f"{shard_id}.json").write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    (out / "hist").mkdir(exist_ok=True)
+    for shard_id, payload in hist_shards.items():
+        (out / "hist" / f"{shard_id}.json").write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+
+    write_analysis(con, out)
 
     total_groups = sum(len(v) for v in index_by_game.values())
     print(f"snapshot_date={snapshot_date} groups={total_groups} shards={len(shards)}")

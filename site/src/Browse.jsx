@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { GAMES } from "./theme.js";
 import { fmt, changeStr, clickable } from "./format.js";
-import { getIndex, getCard, norm, alnum } from "./data.js";
+import { getIndex, getCard, getSealed, norm, alnum } from "./data.js";
 
 const PAGE_SIZE = 24;
 
@@ -50,22 +50,30 @@ function PageButton({ label, target, onPick, disabled, active }) {
   return <a href={target} className="lift-btn" style={style}>{label}</a>;
 }
 
-export default function Browse({ game, set, page, openCard }) {
+export default function Browse({ game, set, page, openCard, sealed = false }) {
   const [index, setIndex] = useState(null);
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState("price_desc");
   const [localPage, setLocalPage] = useState(1);
+  const [sealedGame, setSealedGame] = useState("all");
   useEffect(() => {
     let live = true;
     setIndex(null);
-    getIndex(game).then((i) => live && setIndex(i)).catch(() => {});
+    const load = sealed
+      ? getSealed().then((list) => list.map((e) => ({ gid: e[0], name: e[1], set: e[2], code: e[3], rarity: e[4], price: e[5], change: e[6], game: e[7], norm: norm(e[1]), codeNorm: alnum(e[3]) })))
+      : getIndex(game);
+    load.then((i) => live && setIndex(i)).catch(() => {});
     return () => { live = false; };
-  }, [game]);
-  useEffect(() => { setFilter(""); setSort("price_desc"); setLocalPage(1); }, [game, set]);
+  }, [game, sealed]);
+  useEffect(() => { setFilter(""); setSort("price_desc"); setLocalPage(1); setSealedGame("all"); }, [game, set, sealed]);
   useEffect(() => { window.scrollTo(0, 0); }, [game, set, page]);
 
-  const g = GAMES[game];
-  const scoped = index ? (set ? index.filter((e) => e.set === set) : index) : null;
+  const g = GAMES[sealed ? (sealedGame === "all" ? "mtg" : sealedGame) : game];
+  const scoped = index
+    ? sealed
+      ? (sealedGame === "all" ? index : index.filter((e) => e.game === sealedGame))
+      : (set ? index.filter((e) => e.set === set) : index)
+    : null;
   const nf = norm(filter.trim());
   const cf = alnum(filter.trim());
   const filtering = nf.length > 0;
@@ -79,8 +87,8 @@ export default function Browse({ game, set, page, openCard }) {
     : searched;
   const totalPages = filtered ? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)) : 1;
   // Filtered or re-sorted views paginate locally; the default view keeps
-  // shareable hash-based page links.
-  const customView = filtering || sort !== "price_desc";
+  // shareable hash-based page links. Sealed mode is always local.
+  const customView = sealed || filtering || sort !== "price_desc";
   const current = Math.min(Math.max(1, customView ? localPage : page), totalPages);
   const slice = filtered ? filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE) : [];
   const pick = (n) => (customView ? () => { setLocalPage(n); window.scrollTo(0, 0); } : undefined);
@@ -93,11 +101,11 @@ export default function Browse({ game, set, page, openCard }) {
     <main style={{ maxWidth: 1160, margin: "0 auto", padding: "26px 20px 60px", width: "100%", boxSizing: "border-box" }}>
       <section style={{ animation: "rise .45s ease both" }}>
         <h1 style={{ fontSize: "clamp(30px, 4.5vw, 48px)", fontWeight: 800, letterSpacing: "-1.5px", lineHeight: 1.05, margin: "10px 0 4px" }}>
-          {set ? set : "The whole binder"}
+          {sealed ? "The sealed shelf" : set ? set : "The whole binder"}
         </h1>
         <div style={{ color: "#6e6396", fontSize: 14, marginBottom: 16 }}>
-          {filtered ? `${filtered.length.toLocaleString()} cards` : "counting cards…"} · {g.name} · sorted by price
-          {set && (
+          {filtered ? `${filtered.length.toLocaleString()} ${sealed ? "products" : "cards"}` : "counting…"} · {sealed ? "boxes, decks & bundles" : g.name} · sorted by price
+          {set && !sealed && (
             <>
               {" · "}
               <a href={browseHash(game, null, 1)} style={{ fontWeight: 700 }}>clear set filter ×</a>
@@ -105,17 +113,25 @@ export default function Browse({ game, set, page, openCard }) {
           )}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-          {Object.entries(GAMES).map(([id, gg]) => (
-            <a key={id} href={browseHash(id, null, 1)} className="lift-btn" style={{ fontSize: 14, fontWeight: 700, padding: "8px 16px", borderRadius: 999, border: "2px solid #241a45", cursor: "pointer", textDecoration: "none", background: id === game ? "#241a45" : "#fff", color: id === game ? "#fff6ea" : "#241a45", boxShadow: id === game ? "3px 3px 0 #ff5470" : "3px 3px 0 #241a45" }}>
-              {gg.short}
-            </a>
-          ))}
+          {sealed ? (
+            [["all", "All games"], ...Object.entries(GAMES).map(([id, gg]) => [id, gg.short])].map(([id, label]) => (
+              <button key={id} className="lift-btn" onClick={() => { setSealedGame(id); setLocalPage(1); }} style={{ fontSize: 14, fontWeight: 700, padding: "8px 16px", borderRadius: 999, border: "2px solid #241a45", cursor: "pointer", background: id === sealedGame ? "#241a45" : "#fff", color: id === sealedGame ? "#fff6ea" : "#241a45", boxShadow: id === sealedGame ? "3px 3px 0 #ff5470" : "3px 3px 0 #241a45" }}>
+                {label}
+              </button>
+            ))
+          ) : (
+            Object.entries(GAMES).map(([id, gg]) => (
+              <a key={id} href={browseHash(id, null, 1)} className="lift-btn" style={{ fontSize: 14, fontWeight: 700, padding: "8px 16px", borderRadius: 999, border: "2px solid #241a45", cursor: "pointer", textDecoration: "none", background: id === game ? "#241a45" : "#fff", color: id === game ? "#fff6ea" : "#241a45", boxShadow: id === game ? "3px 3px 0 #ff5470" : "3px 3px 0 #241a45" }}>
+                {gg.short}
+              </a>
+            ))
+          )}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 20 }}>
           <input
             value={filter}
             onChange={(e) => { setFilter(e.target.value); setLocalPage(1); }}
-            placeholder={`Filter ${set || g.short} — name, set, or code`}
+            placeholder={sealed ? "Filter sealed — name or set" : `Filter ${set || g.short} — name, set, or code`}
             style={{ flex: "1 1 260px", maxWidth: 440, boxSizing: "border-box", padding: "10px 18px", border: "2px solid #241a45", borderRadius: 999, background: "#fff", fontSize: 15, fontWeight: 600, outline: "none", boxShadow: "3px 3px 0 #241a45" }}
           />
           {[["price_desc", "price ↓"], ["price_asc", "price ↑"], ["az", "A–Z"]].map(([id, label]) => (
@@ -133,7 +149,7 @@ export default function Browse({ game, set, page, openCard }) {
             const up = (c.change ?? 0) >= 0;
             return (
               <div key={c.gid} className="lift-tile" {...clickable(() => openCard(c.gid))} style={{ background: "#fff", border: "2px solid #241a45", borderRadius: 18, padding: 12, cursor: "pointer", boxShadow: "4px 4px 0 #241a45" }}>
-                <TileArt gid={c.gid} name={c.name} game={game} />
+                <TileArt gid={c.gid} name={c.name} game={c.game || game} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 10 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 11, color: "#7c6fa8", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.set}</div>

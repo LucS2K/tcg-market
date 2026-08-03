@@ -48,6 +48,42 @@ jobs:
       contents: read
     secrets: inherit
 
+  # CLAUDE.md: Riftbound's role is the before/after series if Riot's
+  # first meaningful reprint lands while we are collecting. Check daily.
+  reprint-watch:
+    needs: snapshot
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r dbt/requirements.txt
+      - run: dbt build --project-dir dbt --profiles-dir dbt
+      - name: Check for Riftbound reprints
+        run: |
+          out=$(python scripts/reprint_watch.py)
+          echo "$out"
+          if echo "$out" | grep -q "REPRINT_DETECTED"; then
+            if gh issue list --repo "$REPO" --state open --search "\"Riftbound reprint detected\" in:title" --json number --jq length | grep -qv '^0$'; then
+              echo "issue already open"
+            else
+              gh issue create --repo "$REPO" \
+                --title "Riftbound reprint detected: $(date -u +%F)" \
+                --body "$out
+
+          The moment CLAUDE.md was waiting for. Update scripts/riftbound_reprint_baseline.json to acknowledge, and consider the before/after analysis."
+            fi
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+
   alert-on-failure:
     needs: [snapshot, deploy-site]
     if: failure()

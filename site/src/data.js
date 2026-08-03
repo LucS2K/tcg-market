@@ -69,3 +69,19 @@ export async function getCard(gid) {
 export async function getCards(gids) {
   return Promise.all(gids.map((g) => getCard(g).catch(() => null)));
 }
+
+const histCache = {};
+
+// Full dated history ([daysSinceEpoch, price] pairs) — separate shards,
+// fetched only when a long chart range is opened.
+export async function getHistory(gid) {
+  const meta = await getMeta();
+  const shard = parseInt(gid, 16) % meta.num_shards;
+  histCache[shard] ??= getJson(`hist/${shard}.json`);
+  const payload = await histCache[shard];
+  return payload[gid] || [];
+}
+
+export function getSealed() {
+  return getJson("sealed.json");
+}
