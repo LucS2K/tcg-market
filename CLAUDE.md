@@ -18,8 +18,9 @@ price decay.
   game + lowercased name, a documented heuristic); `reprint_lineage`
   aggregates printing history, excluding Riftbound per the roster
   table. The decay analysis itself needs accumulated daily history.
-- Stage 3 (site live): "Binder" (React + Vite in `site/`), deployed to
-  Vercel at https://tcg-market-nine.vercel.app (project tcg-market,
+- Stage 3 (site live): "NeighborsTCG" (React + Vite in `site/`; brand
+  renamed from the handoff's "Binder" on 2026-08-03), deployed to
+  Vercel at https://neighborstcg.vercel.app (project neighborstcg,
   team woongy; VERCEL_* repo secrets) by the `deploy-site` workflow —
   triggered by pushes touching site/scripts/dbt, manual dispatch, and
   as a job after each daily snapshot (bot pushes don't trigger push

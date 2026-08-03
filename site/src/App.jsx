@@ -108,7 +108,7 @@ export default function App() {
         <div style={{ maxWidth: 1160, margin: "0 auto", padding: "12px 20px", display: "flex", alignItems: "center", gap: 16 }}>
           <div onClick={goHome} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flexShrink: 0 }}>
             <div style={{ width: 36, height: 36, borderRadius: 11, background: "#ff5470", border: "2px solid #241a45", boxShadow: "3px 3px 0 #241a45", display: "grid", placeItems: "center", color: "#fff6ea", fontSize: 19, fontWeight: 800 }}>✦</div>
-            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px" }}>BINDER</div>
+            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px" }}>NeighborsTCG</div>
           </div>
           {isCard && (
             <div style={{ position: "relative", flex: 1, maxWidth: 420 }}>
@@ -148,7 +148,7 @@ export default function App() {
 
       <footer style={{ marginTop: "auto", background: "#241a45", color: "#fff6ea" }}>
         <div style={{ maxWidth: 1160, margin: "0 auto", padding: "26px 20px", display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontWeight: 800, fontSize: 17 }}>✦ BINDER</div>
+          <div style={{ fontWeight: 800, fontSize: 17 }}>✦ NeighborsTCG</div>
           <div style={{ fontSize: 13, color: "#b8aee0", maxWidth: 640, lineHeight: 1.5 }}>
             A hobby project tracking daily market prices. Card names, sets, and images belong to their publishers — Wizards of the Coast, The Pokémon Company, Bandai, Ravensburger &amp; Disney, and Riot Games. Unofficial fan content; not affiliated with or endorsed by any of them. Prices via Scryfall, pokemontcg.io, and TCGplayer market data.
           </div>
