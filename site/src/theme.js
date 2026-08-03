@@ -12,7 +12,7 @@ export const darkPill = (game) => game === "pokemon" || game === "lorcana" || ga
 export const pillFg = (game) => (darkPill(game) ? "#241a45" : "#fff");
 
 export const COPY = {
-  heroBadge: "the price is a vibe. we track the vibe.",
+  heroBadge: "fresh prices, pulled daily",
   heroTitle: "Look what you pulled.",
   heroSub: "Fast price lookups for Magic, Pokémon, One Piece, Lorcana, and Riftbound — with the full reprint saga behind every card.",
   trendTitle: "Movers & shakers", trendSub: "biggest 7-day swings right now",
