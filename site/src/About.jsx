@@ -24,15 +24,10 @@ export default function About({ goHome }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 20, animation: "rise .5s ease .08s both" }}>
         <section style={card}>
           <h2 style={h2}>Why this exists</h2>
-          <p style={p}>
-            I built NeighborsTCG for fun — for me, my friends, and my family. We collect and play
-            across a bunch of card games, and "what's this worth now?" kept coming up at the table.
-            So instead of everyone checking five different sites, there's this one. No ads, no
-            affiliate links, no accounts. Just prices.
-          </p>
           <p style={{ ...p, margin: 0 }}>
-            It's also an excuse to build a data pipeline end-to-end the right way, because that's my
-            idea of fun too.
+            NeighborsTCG is a project I built for my card table. My friends, my family, and I collect
+            and play across a bunch of games, so I made one place to check what things are worth. No
+            ads, no affiliate links, no accounts. Just prices, updated daily.
           </p>
         </section>
 
@@ -74,9 +69,23 @@ export default function About({ goHome }) {
         </section>
 
         <section style={card}>
-          <h2 style={h2}>Who</h2>
+          <h2 style={h2}>About me</h2>
+          <p style={p}>
+            Hi, I'm Luc, a business analyst. This one started at my card table: checking five
+            different sites to answer "what's this worth?" got old, so I built one place. It's also
+            my excuse to build a data pipeline end to end, done properly, because that's my idea of
+            fun too.
+          </p>
+          <p style={p}>
+            I did this end to end: choosing the games and sources, designing the daily collection
+            and its rate-limit budgets, making the modeling and methodology decisions described on
+            this page, and publishing the result. Implementation was AI-assisted (Claude Code); the
+            judgment calls documented above are mine. If you're a hiring team evaluating a business
+            analyst, my <a href="https://sf-inspections.vercel.app">SF health inspections project</a>{" "}
+            is the formal work sample — this is the one I built for fun, and the pipeline is real
+            either way.
+          </p>
           <p style={{ ...p, margin: 0 }}>
-            Built by Luc Nguyen ·{" "}
             <a href="https://www.linkedin.com/in/luchnguyen/">LinkedIn</a> ·{" "}
             <a href="https://github.com/LucS2K">GitHub</a> ·{" "}
             <a href="mailto:ljr.luc.nguyen@gmail.com">ljr.luc.nguyen@gmail.com</a> ·{" "}

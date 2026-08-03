@@ -16,10 +16,13 @@ select
     number,
     rarity,
     set_id,
+    coalesce(set_code, set_id) as set_code,
     set_name,
     released_at,
     image_url,
     artist,
+    tcgplayer_id,
+    coalesce(product_type, 'Cards') as product_type,
     case
         when game = 'mtg' and oracle_id is not null then 'mtg:' || oracle_id
         else game || ':name:' || lower(name)

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GAMES } from "./theme.js";
-import { fmt } from "./format.js";
+import { fmt, clickable } from "./format.js";
 import { getAllIndexes, getMeta } from "./data.js";
 import Home from "./Home.jsx";
 import CardDetail from "./CardDetail.jsx";
@@ -109,7 +109,7 @@ export default function App() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header style={{ position: "sticky", top: 0, zIndex: 50, background: "#fff6ea", borderBottom: "2px solid #241a45" }}>
         <div style={{ maxWidth: 1160, margin: "0 auto", padding: "12px 20px", display: "flex", alignItems: "center", gap: 16 }}>
-          <div onClick={goHome} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flexShrink: 0 }}>
+          <div {...clickable(goHome)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flexShrink: 0 }}>
             <div style={{ width: 36, height: 36, borderRadius: 11, background: "#ff5470", border: "2px solid #241a45", boxShadow: "3px 3px 0 #241a45", display: "grid", placeItems: "center", color: "#fff6ea", fontSize: 19, fontWeight: 800 }}>✦</div>
             <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px" }}>NeighborsTCG</div>
           </div>

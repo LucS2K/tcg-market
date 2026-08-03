@@ -50,10 +50,13 @@ REF_SCHEMA = pa.schema(
         ("number", pa.string()),
         ("rarity", pa.string()),
         ("set_id", pa.string()),
+        ("set_code", pa.string()),
         ("set_name", pa.string()),
         ("released_at", pa.string()),
         ("image_url", pa.string()),
         ("artist", pa.string()),
+        ("tcgplayer_id", pa.int64()),
+        ("product_type", pa.string()),
     ]
 )
 
@@ -149,16 +152,20 @@ def card_price_rows(card: dict) -> list[dict]:
 
 
 def card_ref_row(card: dict, set_info: dict) -> dict:
+    tcgplayer_id = card.get("tcgplayer_id")
     return {
         "card_id": str(card.get("id")),
         "name": card.get("name"),
         "number": card.get("number"),
         "rarity": card.get("rarity"),
         "set_id": str(set_info.get("id")),
+        "set_code": set_info.get("abbreviation"),
         "set_name": set_info.get("name") or card.get("set_name"),
         "released_at": set_info.get("release_date"),
         "image_url": card.get("image_url"),
         "artist": None,  # not provided by tcgapi.dev
+        "tcgplayer_id": int(tcgplayer_id) if tcgplayer_id is not None else None,
+        "product_type": card.get("product_type"),
     }
 
 

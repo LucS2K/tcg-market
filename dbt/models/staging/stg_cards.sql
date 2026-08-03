@@ -8,10 +8,13 @@ select
     number,
     rarity,
     set_id,
+    set_code,
     set_name,
     cast(nullif(released_at, '') as date) as released_at,
     image_url,
-    artist
+    artist,
+    tcgplayer_id,
+    product_type
 from read_parquet(
     'data/reference/game=*/cards.parquet',
     hive_partitioning = true,

@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timezone
 
 from . import pokemon, scryfall, tcgapi
-from .common import GAMES, log, make_session, setup_logging, snapshot_path
+from .common import GAMES, guard_row_count, log, make_session, setup_logging, snapshot_path
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -46,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
                 if tcgapi_client is None:
                     tcgapi_client = tcgapi.TcgApiClient(session)
                 tcgapi.collect_prices(tcgapi_client, game, out_path)
+            guard_row_count(game, args.date, out_path)
         except Exception:
             log.exception("%s date=%s: FAILED", game, args.date)
             failures.append(game)

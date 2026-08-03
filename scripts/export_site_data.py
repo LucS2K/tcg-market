@@ -97,17 +97,24 @@ def main() -> None:
             where currency = 'USD'
         ) where rn = 1
     """)
+    # "Week ago" = the snapshot closest to seven days back within a
+    # -10..-4 day window, so one missed collection day doesn't blank
+    # every change badge.
     con.execute(f"""
         create temp table week_ago as
         select card_key, price
         from (
             select *, row_number() over (
                 partition by card_key
-                order by {FINISH_RANK}, price desc
+                order by
+                    abs(datediff('day', snapshot_date,
+                        (select max(snapshot_date) - 7 from fct_daily_prices))),
+                    {FINISH_RANK}, price desc
             ) as rn
             from fct_daily_prices
             where currency = 'USD'
-              and snapshot_date = (select max(snapshot_date) - 7 from fct_daily_prices)
+              and snapshot_date between (select max(snapshot_date) - 10 from fct_daily_prices)
+                                    and (select max(snapshot_date) - 4 from fct_daily_prices)
         ) where rn = 1
     """)
 
@@ -132,7 +139,7 @@ def main() -> None:
     cards = con.sql("""
         select
             d.reprint_group_key, d.game, d.card_key, d.card_id, d.name,
-            d.number, d.rarity, d.set_id, d.set_name, d.released_at,
+            d.number, d.rarity, d.set_code, d.set_name, d.released_at,
             d.image_url, d.artist,
             l.price,
             w.price as week_ago_price,
@@ -142,10 +149,11 @@ def main() -> None:
         left join week_ago w on w.card_key = d.card_key
         left join reprint_lineage rl on rl.reprint_group_key = d.reprint_group_key
         where d.name is not null
+          and d.product_type != 'Sealed Products'
     """).fetchall()
     columns = [
         "group_key", "game", "card_key", "card_id", "name", "number", "rarity",
-        "set_id", "set_name", "released_at", "image_url", "artist", "price",
+        "set_code", "set_name", "released_at", "image_url", "artist", "price",
         "week_ago_price", "n_printings",
     ]
 
@@ -173,7 +181,7 @@ def main() -> None:
             step = len(spark) / SPARK_POINTS
             spark = [spark[int(i * step)] for i in range(SPARK_POINTS - 1)] + [spark[-1]]
 
-        code = f"{(head['set_id'] or '').upper()} · {head['number'] or '?'}"
+        code = f"{(head['set_code'] or '').upper()} · {head['number'] or '?'}"
         n_printings = int(head["n_printings"] or len(printings))
 
         index_by_game[game].append([
@@ -198,7 +206,7 @@ def main() -> None:
                 {
                     "set": p["set_name"],
                     "year": p["released_at"].year if p["released_at"] else None,
-                    "code": f"{(p['set_id'] or '').upper()} · {p['number'] or '?'}",
+                    "code": f"{(p['set_code'] or '').upper()} · {p['number'] or '?'}",
                     "price": round(p["price"], 2) if p["price"] is not None else None,
                     "current": p is head,
                 }
@@ -221,10 +229,11 @@ def main() -> None:
 
     # Recent sets across games.
     sets_rows = con.sql("""
-        select game, set_id, set_name, min(released_at) as released, count(*) as n_cards
+        select game, set_code, set_name, min(released_at) as released, count(*) as n_cards
         from dim_cards
         where released_at is not null and released_at <= current_date
-        group by game, set_id, set_name
+          and product_type != 'Sealed Products'
+        group by game, set_code, set_name
         order by released desc
         limit 12
     """).fetchall()
@@ -232,12 +241,12 @@ def main() -> None:
         {
             "game": g,
             "name": name,
-            "code": (set_id or "").upper(),
+            "code": (set_code or "").upper(),
             "released": rel.strftime("%b %Y"),
             "cards": n,
             "tag": tag_for(rel, today),
         }
-        for g, set_id, name, rel, n in sets_rows
+        for g, set_code, name, rel, n in sets_rows
     ]
 
     out = OUT_DIR

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { GAMES, COPY, pillFg } from "./theme.js";
-import { fmt, changeStr, sparkPts } from "./format.js";
+import { fmt, changeStr, clickable, sparkPts } from "./format.js";
 import { getCard, getCards } from "./data.js";
 
 export default function CardDetail({ gid, openCard, goHome }) {
@@ -16,11 +16,15 @@ export default function CardDetail({ gid, openCard, goHome }) {
     getCard(gid)
       .then((c) => {
         if (!live) return;
+        document.title = `${c.name} — NeighborsTCG`;
         setCard(c);
         if (c.related?.length) getCards(c.related).then((rs) => live && setRelated(rs.filter(Boolean)));
       })
       .catch(() => live && setError(true));
-    return () => { live = false; };
+    return () => {
+      live = false;
+      document.title = "NeighborsTCG — trading card prices";
+    };
   }, [gid]);
 
   if (error) {
@@ -163,7 +167,7 @@ export default function CardDetail({ gid, openCard, goHome }) {
               const rg = GAMES[r.game];
               const rcs = changeStr(r.change);
               return (
-                <div key={r.id} className="lift-row" onClick={() => openCard(r.id)} style={{ background: "#fff", border: "2px solid #241a45", borderRadius: 16, padding: "12px 14px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", boxShadow: "3px 3px 0 #241a45" }}>
+                <div key={r.id} className="lift-row" {...clickable(() => openCard(r.id))} style={{ background: "#fff", border: "2px solid #241a45", borderRadius: 16, padding: "12px 14px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", boxShadow: "3px 3px 0 #241a45" }}>
                   <div style={{ width: 44, height: 62, borderRadius: 7, border: "2px solid #241a45", background: `linear-gradient(150deg, ${rg.accent2}, ${rg.accent})`, display: "grid", placeItems: "center", color: "rgba(255,255,255,.8)", fontSize: 20, flexShrink: 0, overflow: "hidden" }}>
                     {r.image ? <img src={r.image} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : rg.glyph}
                   </div>

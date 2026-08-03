@@ -1,3 +1,16 @@
+// Spread onto a clickable div to make it keyboard-operable.
+export const clickable = (fn) => ({
+  role: "link",
+  tabIndex: 0,
+  onClick: fn,
+  onKeyDown: (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fn();
+    }
+  },
+});
+
 export function fmt(n) {
   if (n == null) return "—";
   if (n >= 1000) return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });

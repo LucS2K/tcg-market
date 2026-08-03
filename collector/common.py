@@ -58,6 +58,39 @@ def fnum(value) -> float | None:
     return float(value)
 
 
+def latest_prior_partition(game: str, date_str: str) -> Path | None:
+    base = DATA_DIR / f"game={game}"
+    if not base.exists():
+        return None
+    dates = sorted(
+        d.name.split("=", 1)[1]
+        for d in base.iterdir()
+        if d.is_dir() and d.name.startswith("date=")
+    )
+    dates = [d for d in dates if d < date_str]
+    return snapshot_path(game, dates[-1]) if dates else None
+
+
+def guard_row_count(game: str, date_str: str, out_path: Path) -> None:
+    """Discard today's partition and fail loudly if it shrank suspiciously.
+
+    A source quietly returning half its catalog would otherwise be
+    committed as truth. Discarding keeps the run retryable: the next
+    attempt re-collects instead of skipping a bad partition.
+    """
+    prior = latest_prior_partition(game, date_str)
+    if prior is None:
+        return
+    today_rows = pq.read_metadata(out_path).num_rows
+    prior_rows = pq.read_metadata(prior).num_rows
+    if prior_rows and today_rows < 0.5 * prior_rows:
+        out_path.unlink()
+        raise RuntimeError(
+            f"{game}: row count {today_rows} is less than half of {prior_rows} "
+            f"({prior.parent.name}); partition discarded — source likely returned partial data"
+        )
+
+
 def write_partition(rows: list[dict], schema: pa.Schema, out_path: Path) -> None:
     if not rows:
         raise RuntimeError(f"refusing to write empty partition: {out_path}")

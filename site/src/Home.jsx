@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { GAMES, COPY, pillFg } from "./theme.js";
-import { fmt, changeStr, sparkPts } from "./format.js";
+import { fmt, changeStr, clickable } from "./format.js";
 import { getSets } from "./data.js";
 import { SearchResults } from "./App.jsx";
 
@@ -65,7 +65,7 @@ export default function Home({ gameFilter, setGameFilter, searchProps, focused, 
             const cs = changeStr(c.change);
             const spark = null; // index entries carry no history; sparkline lives on the detail page
             return (
-              <div key={c.gid} className="lift-tile" onClick={() => searchProps.openCard(c.gid)} style={{ background: "#fff", border: "2px solid #241a45", borderRadius: 18, padding: 12, cursor: "pointer", boxShadow: "4px 4px 0 #241a45" }}>
+              <div key={c.gid} className="lift-tile" {...clickable(() => searchProps.openCard(c.gid))} style={{ background: "#fff", border: "2px solid #241a45", borderRadius: 18, padding: 12, cursor: "pointer", boxShadow: "4px 4px 0 #241a45" }}>
                 <div style={{ aspectRatio: "5/7", borderRadius: 12, border: "2px solid #241a45", background: `linear-gradient(150deg, ${g.accent2}, ${g.accent})`, position: "relative", overflow: "hidden", display: "grid", placeItems: "center" }}>
                   <div style={{ fontSize: 64, color: "rgba(255,255,255,.35)" }}>{g.glyph}</div>
                   <MoverArt gid={c.gid} name={c.name} />
@@ -96,7 +96,7 @@ export default function Home({ gameFilter, setGameFilter, searchProps, focused, 
           {visibleSets.map((s) => {
             const g = GAMES[s.game];
             return (
-              <div key={s.game + s.code + s.name} className="lift-tile" onClick={() => setGameFilter(s.game)} style={{ background: "#fff", border: "2px solid #241a45", borderRadius: 18, padding: 18, cursor: "pointer", position: "relative", boxShadow: "4px 4px 0 #241a45", overflow: "hidden" }}>
+              <div key={s.game + s.code + s.name} className="lift-tile" {...clickable(() => setGameFilter(s.game))} style={{ background: "#fff", border: "2px solid #241a45", borderRadius: 18, padding: 18, cursor: "pointer", position: "relative", boxShadow: "4px 4px 0 #241a45", overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: `linear-gradient(90deg, ${g.accent2}, ${g.accent})` }} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 999, border: "1.5px solid #241a45", background: g.accent, color: pillFg(s.game) }}>{g.short}</span>
