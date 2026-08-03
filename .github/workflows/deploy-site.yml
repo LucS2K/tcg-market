@@ -52,6 +52,8 @@ jobs:
       # Last on purpose: a MotherDuck hiccup should page us (red run)
       # without blocking the site deploy.
       - name: Mirror marts to MotherDuck
-        run: dbt build --project-dir dbt --profiles-dir dbt --target md
+        run: |
+          python -c "import duckdb; duckdb.connect('md:').execute('CREATE DATABASE IF NOT EXISTS tcg_market')"
+          dbt build --project-dir dbt --profiles-dir dbt --target md
         env:
           motherduck_token: ${{ secrets.MOTHERDUCK_TOKEN }}
