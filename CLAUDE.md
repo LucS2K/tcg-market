@@ -18,8 +18,18 @@ price decay.
   game + lowercased name, a documented heuristic); `reprint_lineage`
   aggregates printing history, excluding Riftbound per the roster
   table. The decay analysis itself needs accumulated daily history.
-- Stage 3+: analysis and site. Not started. Design handoff for the site
-  ("Binder") lives untracked in `design/`.
+- Stage 3 (site live): "Binder" (React + Vite in `site/`), deployed to
+  GitHub Pages at https://lucs2k.github.io/tcg-market/ by the
+  `deploy-site` workflow — triggered by pushes touching
+  site/scripts/dbt, manual dispatch, and as a job after each daily
+  snapshot (bot pushes don't trigger push workflows).
+  `scripts/export_site_data.py` turns the dbt marts into static JSON
+  (search unit = reprint group; card scans hotlinked with artist
+  credit per the imagery policy). Design handoff lives untracked in
+  `design/`. Remaining polish: tag One Piece sealed products
+  (product_type) so they can be filtered; 7-day changes and trend
+  charts fill in automatically as partitions accumulate.
+- Stage 4+: the reprint decay analysis itself, once history exists.
 
 ## Roster: closed at five games
 
