@@ -6,6 +6,8 @@ with unioned as (
     select * from {{ ref('stg_pokemon_prices') }}
     union all
     select * from {{ ref('stg_tcgplayer_prices') }}
+    union all
+    select * from {{ ref('stg_tcgcsv_history') }}
 )
 
 select

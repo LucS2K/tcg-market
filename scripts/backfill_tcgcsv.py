@@ -151,9 +151,17 @@ def load_pokemon_map(session) -> dict[int, str]:
             card_id = by_key.get(key)
             if card_id:
                 mapping[int(pr["productId"])] = card_id
+    # One product per card: name+number also matches World Championship
+    # reprints and promo variants in other groups, which duplicates the
+    # natural key downstream. The lowest productId is the original
+    # set-release listing (reprint products are always listed later).
+    by_card: dict[str, list[int]] = {}
+    for pid, cid in mapping.items():
+        by_card.setdefault(cid, []).append(pid)
+    mapping = {min(pids): cid for cid, pids in by_card.items()}
     log.info(
-        "pokemon: matched %d of %d tcgplayer card products (%.0f%%)",
-        len(mapping), products_seen, 100 * len(mapping) / max(products_seen, 1),
+        "pokemon: matched %d cards from %d tcgplayer card products",
+        len(mapping), products_seen,
     )
     return mapping
 
