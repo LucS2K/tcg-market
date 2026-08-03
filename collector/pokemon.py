@@ -101,6 +101,35 @@ def ref_row(card: dict) -> dict:
     }
 
 
+def _get_page(session: requests.Session, page: int, select: str, headers: dict) -> dict:
+    # pokemontcg.io throws intermittent 500s in windows that outlast the
+    # session's ~30s of urllib3 backoff, so retry patiently on 5xx and
+    # connection failures. 4xx still fails loudly on the first hit.
+    attempts = 6
+    for attempt in range(1, attempts + 1):
+        try:
+            resp = session.get(
+                API_URL,
+                params={"page": page, "pageSize": PAGE_SIZE, "select": select},
+                headers=headers,
+                timeout=(10, 120),
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.exceptions.RetryError, requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout) as exc:
+            err = exc
+        except requests.exceptions.HTTPError as exc:
+            if exc.response is None or exc.response.status_code < 500:
+                raise
+            err = exc
+        if attempt == attempts:
+            raise err
+        log.warning("pokemon: page %d attempt %d/%d failed (%s); retrying in 30s",
+                    page, attempt, attempts, type(err).__name__)
+        time.sleep(30)
+
+
 def iter_cards(session: requests.Session, select: str) -> Iterator[dict]:
     headers = {}
     api_key = os.environ.get("POKEMONTCG_API_KEY")
@@ -113,14 +142,7 @@ def iter_cards(session: requests.Session, select: str) -> Iterator[dict]:
     page = 1
     fetched = 0
     while True:
-        resp = session.get(
-            API_URL,
-            params={"page": page, "pageSize": PAGE_SIZE, "select": select},
-            headers=headers,
-            timeout=(10, 120),
-        )
-        resp.raise_for_status()
-        payload = resp.json()
+        payload = _get_page(session, page, select, headers)
         data = payload.get("data") or []
         yield from data
         fetched += len(data)
