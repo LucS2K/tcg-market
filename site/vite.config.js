@@ -1,8 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Deployed at https://lucs2k.github.io/tcg-market/
+// Deployed on Vercel at the domain root. SITE_BASE overrides for any
+// subpath host (e.g. SITE_BASE=/tcg-market/ for GitHub Pages).
 export default defineConfig({
   plugins: [react()],
-  base: "/tcg-market/",
+  base: process.env.SITE_BASE || "/",
 });

@@ -1,9 +1,9 @@
 name: deploy-site
 
 # Builds the marts, exports site JSON, builds the React app, deploys to
-# GitHub Pages. Checks out latest main explicitly so the daily-snapshot
-# caller deploys the partition it just committed (the workflow's trigger
-# SHA predates that commit).
+# Vercel, and mirrors the marts to MotherDuck. Checks out latest main
+# explicitly so the daily-snapshot caller deploys the partition it just
+# committed (the workflow's trigger SHA predates that commit).
 on:
   push:
     branches: [main]
@@ -14,18 +14,25 @@ on:
       - ".github/workflows/deploy-site.yml"
   workflow_dispatch:
   workflow_call:
+    secrets:
+      VERCEL_TOKEN:
+        required: true
+      VERCEL_ORG_ID:
+        required: true
+      VERCEL_PROJECT_ID:
+        required: true
+      MOTHERDUCK_TOKEN:
+        required: true
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: site-deploy
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +44,11 @@ jobs:
       - run: pip install -r dbt/requirements.txt
       - run: dbt build --project-dir dbt --profiles-dir dbt
       - run: python scripts/export_site_data.py
+      - name: Mirror marts to MotherDuck
+        run: dbt build --project-dir dbt --profiles-dir dbt --target md
+        env:
+          motherduck_token: ${{ secrets.MOTHERDUCK_TOKEN }}
+          MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -44,15 +56,10 @@ jobs:
         working-directory: site
       - run: npm run build
         working-directory: site
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site/dist
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Deploy to Vercel
+        run: npx vercel deploy dist --prod --yes --token "$VERCEL_TOKEN"
+        working-directory: site
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

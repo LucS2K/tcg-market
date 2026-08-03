@@ -9,3 +9,9 @@ tcg_market:
       type: duckdb
       path: dbt/tcg.duckdb
       threads: 4
+    # Hosted warehouse mirror. Auth: motherduck_token env var (set from
+    # the MOTHERDUCK_TOKEN secret in CI).
+    md:
+      type: duckdb
+      path: "md:tcg_market"
+      threads: 4

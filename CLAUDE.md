@@ -19,10 +19,13 @@ price decay.
   aggregates printing history, excluding Riftbound per the roster
   table. The decay analysis itself needs accumulated daily history.
 - Stage 3 (site live): "Binder" (React + Vite in `site/`), deployed to
-  GitHub Pages at https://lucs2k.github.io/tcg-market/ by the
-  `deploy-site` workflow — triggered by pushes touching
-  site/scripts/dbt, manual dispatch, and as a job after each daily
-  snapshot (bot pushes don't trigger push workflows).
+  Vercel at https://tcg-market-nine.vercel.app (project tcg-market,
+  team woongy; VERCEL_* repo secrets) by the `deploy-site` workflow —
+  triggered by pushes touching site/scripts/dbt, manual dispatch, and
+  as a job after each daily snapshot (bot pushes don't trigger push
+  workflows). The same workflow mirrors the dbt marts to MotherDuck
+  (`md:tcg_market`, MOTHERDUCK_TOKEN secret, `--target md`). GitHub
+  Pages was the original host, retired 2026-08-03 in favor of Vercel.
   `scripts/export_site_data.py` turns the dbt marts into static JSON
   (search unit = reprint group; card scans hotlinked with artist
   credit per the imagery policy). Design handoff lives untracked in
