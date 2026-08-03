@@ -30,10 +30,17 @@ price decay.
   `scripts/export_site_data.py` turns the dbt marts into static JSON
   (search unit = reprint group; card scans hotlinked with artist
   credit per the imagery policy). Design handoff lives untracked in
-  `design/`. Remaining polish: tag One Piece sealed products
-  (product_type) so they can be filtered; 7-day changes and trend
-  charts fill in automatically as partitions accumulate.
-- Stage 4+: the reprint decay analysis itself, once history exists.
+  `design/`. Site features: browse pages with filter/sort, sealed
+  shelf (#/sealed), local-storage binder with binder-code
+  backup/sharing (#/binder), chart ranges 12w/1y/all (history in
+  lazily-fetched hist/ shards), EUR display where Cardmarket data
+  exists.
+- Stage 4 (preliminary, live): #/analysis — fixed-basket market index
+  per game and median reprint-decay curves from the backfilled
+  history, recomputed at every export. Pokemon's curve is flagged
+  unreliable (name-based lineage). A daily reprint-watch job compares
+  Riftbound against scripts/riftbound_reprint_baseline.json and opens
+  a GitHub issue when Riot's first real reprint lands.
 
 ## Roster: closed at five games
 
