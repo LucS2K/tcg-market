@@ -4,10 +4,13 @@ import { fmt } from "./format.js";
 import { getAllIndexes, getMeta } from "./data.js";
 import Home from "./Home.jsx";
 import CardDetail from "./CardDetail.jsx";
+import About from "./About.jsx";
 
 function viewFromHash() {
   const m = window.location.hash.match(/^#\/card\/([0-9a-f]+)/);
-  return m ? { t: "card", id: m[1] } : { t: "home" };
+  if (m) return { t: "card", id: m[1] };
+  if (window.location.hash.startsWith("#/about")) return { t: "about" };
+  return { t: "home" };
 }
 
 function SearchResults({ results, loading, compact, onOpen }) {
@@ -132,7 +135,9 @@ export default function App() {
         </div>
       </header>
 
-      {isCard ? (
+      {view.t === "about" ? (
+        <About goHome={goHome} />
+      ) : isCard ? (
         <CardDetail key={view.id} gid={view.id} openCard={openCard} goHome={goHome} />
       ) : (
         <Home
@@ -150,7 +155,8 @@ export default function App() {
         <div style={{ maxWidth: 1160, margin: "0 auto", padding: "26px 20px", display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ fontWeight: 800, fontSize: 17 }}>✦ NeighborsTCG</div>
           <div style={{ fontSize: 13, color: "#b8aee0", maxWidth: 640, lineHeight: 1.5 }}>
-            A hobby project tracking daily market prices. Card names, sets, and images belong to their publishers — Wizards of the Coast, The Pokémon Company, Bandai, Ravensburger &amp; Disney, and Riot Games. Unofficial fan content; not affiliated with or endorsed by any of them. Prices via Scryfall, pokemontcg.io, and TCGplayer market data.
+            A hobby project tracking daily market prices. Card names, sets, and images belong to their publishers — Wizards of the Coast, The Pokémon Company, Bandai, Ravensburger &amp; Disney, and Riot Games. Unofficial fan content; not affiliated with or endorsed by any of them. Prices via Scryfall, pokemontcg.io, and TCGplayer market data.{" "}
+            <a href="#/about" style={{ color: "#fff6ea", fontWeight: 700 }}>About this site →</a>
           </div>
         </div>
       </footer>
