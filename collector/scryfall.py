@@ -38,6 +38,7 @@ REF_SCHEMA = pa.schema(
         ("released_at", pa.string()),
         ("image_url", pa.string()),
         ("artist", pa.string()),
+        ("tcgplayer_id", pa.int64()),
     ]
 )
 
@@ -73,6 +74,7 @@ def ref_row(card: dict) -> dict:
         "released_at": card.get("released_at"),
         "image_url": (image_uris or {}).get("normal"),
         "artist": card.get("artist"),
+        "tcgplayer_id": card.get("tcgplayer_id"),
     }
 
 

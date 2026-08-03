@@ -36,6 +36,8 @@ def main() -> int:
     setup_logging()
     session = make_session()
     categories = resolve_categories(session)
+    # Only the tcgapi-sourced games carry a set_code column.
+    categories = {g: c for g, c in categories.items() if g in ("onepiece", "lorcana", "riftbound")}
     failures = 0
     for game, cat in categories.items():
         resp = session.get(GROUPS_URL.format(cat=cat), timeout=(10, 60))

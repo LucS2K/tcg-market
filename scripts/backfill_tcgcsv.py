@@ -21,7 +21,7 @@ import argparse
 import datetime as dt
 import io
 import json
-import shutil
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -32,8 +32,14 @@ import pyarrow.parquet as pq
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from collector.common import log, make_session, setup_logging, snapshot_path, fnum, write_partition  # noqa: E402
+from collector.common import DATA_DIR, log, make_session, setup_logging, snapshot_path, fnum, write_partition  # noqa: E402
 from collector.tcgapi import PRICE_SCHEMA  # noqa: E402
+
+
+def partition_path(game: str, date_str: str) -> Path:
+    if game in BACKFILL_LAYOUT_GAMES:
+        return DATA_DIR / "backfill" / f"game={game}" / f"date={date_str}" / "prices.parquet"
+    return snapshot_path(game, date_str)
 
 ARCHIVE_URL = "https://tcgcsv.com/archive/tcgplayer/prices-{date}.ppmd.7z"
 CATEGORIES_URL = "https://tcgcsv.com/tcgplayer/categories"
@@ -43,7 +49,15 @@ CATEGORY_TOKENS = {
     "onepiece": ("one piece",),
     "lorcana": ("lorcana",),
     "riftbound": ("riftbound",),
+    "mtg": ("magic",),
+    "pokemon": ("pokemon",),
 }
+
+# The tcgapi-sourced games share the forward snapshot schema, so their
+# history lands in the normal layout. MTG and Pokemon forward snapshots
+# use different schemas (Scryfall / pokemontcg.io), so their TCGplayer
+# history lands under data/backfill/ with its own staging model.
+BACKFILL_LAYOUT_GAMES = {"mtg", "pokemon"}
 
 
 def resolve_categories(session) -> dict[str, int]:
@@ -59,6 +73,89 @@ def resolve_categories(session) -> dict[str, int]:
                 break
     log.info("tcgcsv categories: %s", out)
     return out
+
+
+def _name_token(name: str) -> str:
+    for token in re.split(r"[^A-Za-z0-9]+", name or ""):
+        if token:
+            return token.lower()
+    return ""
+
+
+def _norm_num(number: str) -> str:
+    """Normalize collector numbers: '025/185' -> '25/185', 'SWSH001' -> 'SWSH1'."""
+    parts = []
+    for seg in (number or "").upper().split("/"):
+        seg = re.sub(r"(?<![0-9])0+([0-9])", r"\1", seg.strip())
+        parts.append(seg)
+    return "/".join(p for p in parts if p)
+
+
+def load_pokemon_map(session) -> dict[int, str]:
+    """tcgplayer productId -> pokemontcg.io card id.
+
+    pokemontcg.io exposes no TCGplayer product id, so match on
+    (first name token, normalized collector number), indexing our cards
+    under both 'num' and 'num/printedTotal' forms. Ambiguous keys are
+    dropped entirely — an unmapped product beats a wrong price row.
+    """
+    resp = session.get(
+        "https://api.pokemontcg.io/v2/sets",
+        params={"pageSize": 250, "select": "id,printedTotal"},
+        timeout=(10, 120),
+    )
+    resp.raise_for_status()
+    totals = {s["id"]: s.get("printedTotal") for s in resp.json()["data"]}
+
+    ref = pq.read_table(
+        REPO_ROOT / "data" / "reference" / "game=pokemon" / "cards.parquet",
+        columns=["card_id", "name", "number", "set_id"],
+    )
+    by_key: dict[tuple, str] = {}
+    ambiguous: set[tuple] = set()
+
+    def index(key, card_id):
+        if by_key.get(key, card_id) != card_id:
+            ambiguous.add(key)
+        else:
+            by_key[key] = card_id
+
+    for card_id, name, number, set_id in zip(*(c.to_pylist() for c in ref.columns)):
+        token = _name_token(name)
+        num = _norm_num(number)
+        if not token or not num:
+            continue
+        index((token, num), card_id)
+        total = totals.get(set_id)
+        if total:
+            index((token, f"{num}/{total}"), card_id)
+    for key in ambiguous:
+        by_key.pop(key, None)
+
+    groups = session.get("https://tcgcsv.com/tcgplayer/3/groups", timeout=(10, 60)).json()["results"]
+    mapping: dict[int, str] = {}
+    products_seen = 0
+    for group in groups:
+        prods = session.get(
+            f"https://tcgcsv.com/tcgplayer/3/{group['groupId']}/products", timeout=(10, 60)
+        ).json()["results"]
+        for pr in prods:
+            number = next(
+                (ed.get("value") for ed in pr.get("extendedData", []) if ed.get("name") == "Number"),
+                None,
+            )
+            if not number:
+                continue  # sealed product or non-card
+            products_seen += 1
+            key = (_name_token(pr.get("cleanName") or pr.get("name", "")), _norm_num(number))
+            card_id = by_key.get(key)
+            if card_id:
+                mapping[int(pr["productId"])] = card_id
+    log.info(
+        "pokemon: matched %d of %d tcgplayer card products (%.0f%%)",
+        len(mapping), products_seen, 100 * len(mapping) / max(products_seen, 1),
+    )
+    return mapping
 
 
 def load_tcgplayer_map(game: str) -> dict[int, str]:
@@ -95,7 +192,7 @@ def price_rows_from_file(payload: dict, mapping: dict[int, str]) -> tuple[list[d
 
 def backfill_date(session, date: dt.date, categories: dict[str, int], maps: dict[str, dict]) -> None:
     date_str = date.isoformat()
-    targets = {g: snapshot_path(g, date_str) for g in categories}
+    targets = {g: partition_path(g, date_str) for g in categories}
     targets = {g: p for g, p in targets.items() if not p.exists()}
     if not targets:
         log.info("%s: all partitions exist, skipping", date_str)
@@ -142,14 +239,17 @@ def main(argv=None) -> int:
     parser.add_argument("--since", default="2024-02-08")
     parser.add_argument("--until", default=(dt.date.today() - dt.timedelta(days=1)).isoformat())
     parser.add_argument("--every", type=int, default=7, help="sample every N days")
-    parser.add_argument("--games", nargs="*", default=list(CATEGORY_TOKENS))
+    parser.add_argument("--games", nargs="*", default=["onepiece", "lorcana", "riftbound"])
     args = parser.parse_args(argv)
 
     setup_logging()
     session = make_session()
     categories = resolve_categories(session)
     categories = {g: c for g, c in categories.items() if g in args.games}
-    maps = {g: load_tcgplayer_map(g) for g in categories}
+    maps = {
+        g: (load_pokemon_map(session) if g == "pokemon" else load_tcgplayer_map(g))
+        for g in categories
+    }
 
     start = dt.date.fromisoformat(args.since)
     end = dt.date.fromisoformat(args.until)
