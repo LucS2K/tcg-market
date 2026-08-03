@@ -10,7 +10,7 @@ select
     card_id,
     cast("date" as date) as snapshot_date,
     source,
-    coalesce(variant, 'default') as finish,
+    lower(coalesce(variant, 'default')) as finish,
     currency,
     case source
         when 'tcgplayer' then coalesce(market, mid)

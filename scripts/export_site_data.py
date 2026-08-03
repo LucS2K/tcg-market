@@ -87,7 +87,7 @@ def main() -> None:
     # for change when history exists.
     con.execute(f"""
         create temp table latest as
-        select card_key, game, card_id, price, snapshot_date
+        select card_key, game, card_id, finish, price, snapshot_date
         from (
             select *, row_number() over (
                 partition by card_key
@@ -100,16 +100,16 @@ def main() -> None:
     # "Week ago" = the snapshot closest to seven days back within a
     # -10..-4 day window, so one missed collection day doesn't blank
     # every change badge.
-    con.execute(f"""
+    con.execute("""
         create temp table week_ago as
-        select card_key, price
+        select card_key, finish, price
         from (
             select *, row_number() over (
-                partition by card_key
+                partition by card_key, finish
                 order by
                     abs(datediff('day', snapshot_date,
                         (select max(snapshot_date) - 7 from fct_daily_prices))),
-                    {FINISH_RANK}, price desc
+                    price desc
             ) as rn
             from fct_daily_prices
             where currency = 'USD'
@@ -119,18 +119,22 @@ def main() -> None:
     """)
 
     # Spark history per printing: weekly-ish sample of the last 84 days.
-    spark_rows = con.sql(f"""
-        select card_key, snapshot_date, price
+    # History follows the same finish as the headline price so charts
+    # never mix foil and non-foil readings.
+    spark_rows = con.sql("""
+        select f.card_key, f.snapshot_date, f.price
         from (
             select *, row_number() over (
-                partition by card_key, snapshot_date
-                order by {FINISH_RANK}, price desc
+                partition by card_key, snapshot_date, finish
+                order by price desc
             ) as rn
             from fct_daily_prices
             where currency = 'USD'
               and snapshot_date > (select max(snapshot_date) - 84 from fct_daily_prices)
-        ) where rn = 1
-        order by card_key, snapshot_date
+        ) f
+        join latest l on l.card_key = f.card_key and l.finish = f.finish
+        where f.rn = 1
+        order by f.card_key, f.snapshot_date
     """).fetchall()
     history: dict[str, list[float]] = defaultdict(list)
     for card_key, _d, price in spark_rows:
@@ -146,7 +150,7 @@ def main() -> None:
             rl.n_printings
         from dim_cards d
         join latest l on l.card_key = d.card_key
-        left join week_ago w on w.card_key = d.card_key
+        left join week_ago w on w.card_key = d.card_key and w.finish = l.finish
         left join reprint_lineage rl on rl.reprint_group_key = d.reprint_group_key
         where d.name is not null
           and d.product_type != 'Sealed Products'
@@ -174,7 +178,12 @@ def main() -> None:
         price = round(head["price"], 2)
         change = None
         if head["week_ago_price"]:
-            change = round((head["price"] - head["week_ago_price"]) / head["week_ago_price"] * 100, 1)
+            ratio = head["price"] / head["week_ago_price"]
+            # A >10x weekly move in aggregate market data is nearly always
+            # a source glitch (placeholder listings, thin-market
+            # marketPrice), not signal. Suppress the badge, keep the card.
+            if 0.1 <= ratio <= 10:
+                change = round((ratio - 1) * 100, 1)
 
         spark = history.get(head["card_key"], [price])
         if len(spark) > SPARK_POINTS:
@@ -268,12 +277,15 @@ def main() -> None:
         change = entry[6]
         return (0, -abs(change)) if change is not None else (1, -(entry[5] or 0))
 
+    # Movers exclude sub-$2 cards: percentage ranking otherwise drowns
+    # in penny-card noise ($0.30 -> $5 is +1600%).
     trending = {}
     all_entries = []
     for game, entries in index_by_game.items():
-        ranked = sorted(entries, key=mover_rank)[:8]
+        eligible = [e for e in entries if (e[5] or 0) >= 2]
+        ranked = sorted(eligible, key=mover_rank)[:8]
         trending[game] = [e + [game] for e in ranked]
-        all_entries.extend(e + [game] for e in entries)
+        all_entries.extend(e + [game] for e in eligible)
     # "All games" view: at most 2 per game so one game's outliers don't
     # monopolize the grid, then fill any remaining slots by global rank.
     ranked_all = sorted(all_entries, key=mover_rank)

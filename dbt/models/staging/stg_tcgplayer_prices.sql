@@ -1,4 +1,4 @@
--- tcgapi.dev daily snapshots (Lorcana, One Piece, Riftbound) — TCGplayer
+﻿-- tcgapi.dev daily snapshots (Lorcana, One Piece, Riftbound): TCGplayer
 -- market data, USD. Market price falls back to median when absent.
 with raw as (
     select * from read_parquet([
@@ -15,6 +15,13 @@ select
     'tcgplayer' as source,
     lower(coalesce(printing, 'normal')) as finish,
     currency,
-    coalesce(market_price, median_price) as price
+    -- Same illiquidity guard as stg_tcgcsv_history: distrust a market
+    -- price sitting below 10% of mid.
+    case
+        when market_price is not null and median_price is not null
+             and (market_price < 0.1 * median_price or market_price > 10 * median_price) then median_price
+        else coalesce(market_price, median_price)
+    end as price
 from raw
 where coalesce(market_price, median_price) is not null
+

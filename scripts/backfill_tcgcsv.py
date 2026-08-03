@@ -109,10 +109,11 @@ def load_pokemon_map(session) -> dict[int, str]:
 
     ref = pq.read_table(
         REPO_ROOT / "data" / "reference" / "game=pokemon" / "cards.parquet",
-        columns=["card_id", "name", "number", "set_id"],
+        columns=["card_id", "name", "number", "set_id", "set_name"],
     )
     by_key: dict[tuple, str] = {}
     ambiguous: set[tuple] = set()
+    set_tokens: dict[str, set] = {}
 
     def index(key, card_id):
         if by_key.get(key, card_id) != card_id:
@@ -120,11 +121,12 @@ def load_pokemon_map(session) -> dict[int, str]:
         else:
             by_key[key] = card_id
 
-    for card_id, name, number, set_id in zip(*(c.to_pylist() for c in ref.columns)):
+    for card_id, name, number, set_id, set_name in zip(*(c.to_pylist() for c in ref.columns)):
         token = _name_token(name)
         num = _norm_num(number)
         if not token or not num:
             continue
+        set_tokens[card_id] = {t for t in re.split(r"[^a-z0-9]+", (set_name or "").lower()) if len(t) > 2}
         index((token, num), card_id)
         total = totals.get(set_id)
         if total:
@@ -133,9 +135,10 @@ def load_pokemon_map(session) -> dict[int, str]:
         by_key.pop(key, None)
 
     groups = session.get("https://tcgcsv.com/tcgplayer/3/groups", timeout=(10, 60)).json()["results"]
-    mapping: dict[int, str] = {}
+    candidates: dict[str, list[tuple]] = {}
     products_seen = 0
     for group in groups:
+        group_tokens = {t for t in re.split(r"[^a-z0-9]+", (group.get("name") or "").lower()) if len(t) > 2}
         prods = session.get(
             f"https://tcgcsv.com/tcgplayer/3/{group['groupId']}/products", timeout=(10, 60)
         ).json()["results"]
@@ -150,15 +153,17 @@ def load_pokemon_map(session) -> dict[int, str]:
             key = (_name_token(pr.get("cleanName") or pr.get("name", "")), _norm_num(number))
             card_id = by_key.get(key)
             if card_id:
-                mapping[int(pr["productId"])] = card_id
-    # One product per card: name+number also matches World Championship
-    # reprints and promo variants in other groups, which duplicates the
-    # natural key downstream. The lowest productId is the original
-    # set-release listing (reprint products are always listed later).
-    by_card: dict[str, list[int]] = {}
-    for pid, cid in mapping.items():
-        by_card.setdefault(cid, []).append(pid)
-    mapping = {min(pids): cid for cid, pids in by_card.items()}
+                overlap = len(group_tokens & set_tokens.get(card_id, set()))
+                candidates.setdefault(card_id, []).append((overlap, int(pr["productId"])))
+    # One product per card. Name+number also matches World Championship
+    # reprints and promo variants in other groups, so prefer the product
+    # whose TCGplayer group name shares words with the card's set name
+    # (product ids for old sets are not chronological, so id order alone
+    # is not a safe tie-break). Ties fall back to the lowest product id.
+    mapping = {}
+    for card_id, cands in candidates.items():
+        best = max(cands, key=lambda t: (t[0], -t[1]))
+        mapping[best[1]] = card_id
     log.info(
         "pokemon: matched %d cards from %d tcgplayer card products",
         len(mapping), products_seen,
