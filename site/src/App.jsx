@@ -187,6 +187,9 @@ export default function App() {
             <a href="#/binder" className="lift-btn" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 13, fontWeight: 700, color: "#fff6ea", textDecoration: "none", background: "#ff5470", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", whiteSpace: "nowrap", boxShadow: "2px 2px 0 #241a45" }}>
               binder{binderN > 0 ? ` · ${binderN}` : ""}
             </a>
+            <a href="#/analysis" className="lift-btn" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 13, fontWeight: 700, color: "#241a45", textDecoration: "none", background: "#fff", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", whiteSpace: "nowrap", boxShadow: "2px 2px 0 #241a45" }}>
+              analysis
+            </a>
             <a href="#/about" className="lift-btn" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 13, fontWeight: 700, color: "#241a45", textDecoration: "none", background: "#ffe36a", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", whiteSpace: "nowrap", boxShadow: "2px 2px 0 #241a45" }}>
               about me
             </a>
