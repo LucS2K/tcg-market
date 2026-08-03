@@ -11,3 +11,6 @@ dbt/target/
 dbt/tcg.duckdb
 logs/
 dbt/.user.yml
+site/node_modules/
+site/dist/
+site/public/data/

@@ -38,3 +38,13 @@ jobs:
             git pull --rebase origin main
             git push
           fi
+
+  # Bot pushes don't trigger push workflows, so the daily site refresh
+  # rides on this workflow instead.
+  deploy-site:
+    needs: snapshot
+    uses: ./.github/workflows/deploy-site.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
