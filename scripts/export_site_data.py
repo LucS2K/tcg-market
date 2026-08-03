@@ -21,6 +21,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -166,6 +167,19 @@ def main() -> None:
         rec = dict(zip(columns, row))
         groups[rec["group_key"]].append(rec)
 
+    # Stand-in art for variant printings whose own product photo is
+    # missing upstream (common for Organized Play promos): the base-name
+    # card usually carries the same illustration. Same source CDN only.
+    def base_name(name: str) -> str:
+        return re.sub(r"\s*\([^)]*\)", "", name or "").strip().lower()
+
+    name_image: dict[tuple, str] = {}
+    for rows_ in groups.values():
+        for rec in rows_:
+            key = (rec["game"], base_name(rec["name"]))
+            if rec["image_url"] and key not in name_image:
+                name_image[key] = rec["image_url"]
+
     index_by_game: dict[str, list] = defaultdict(list)
     shards: dict[int, dict] = defaultdict(dict)
     detail_by_gid: dict[str, dict] = {}
@@ -209,6 +223,13 @@ def main() -> None:
             "change": change,
             "spark": spark,
             "image": head["image_url"],
+            "images": list(dict.fromkeys(
+                [u for u in (
+                    head["image_url"],
+                    *(p["image_url"] for p in printings),
+                    name_image.get((game, base_name(head["name"]))),
+                ) if u]
+            ))[:4],
             "artist": head["artist"],
             "blurb": blurb_for(game, head["name"], n_printings, price),
             "printings": [

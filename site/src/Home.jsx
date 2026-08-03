@@ -117,14 +117,19 @@ export default function Home({ gameFilter, setGameFilter, searchProps, focused, 
 // Lazily swaps the gradient placeholder for the real card scan.
 import { getCard } from "./data.js";
 function MoverArt({ gid, name }) {
-  const [src, setSrc] = useState(null);
+  const [srcs, setSrcs] = useState([]);
+  const [idx, setIdx] = useState(0);
   useEffect(() => {
     let live = true;
-    getCard(gid).then((c) => { if (live && c.image) setSrc(c.image); }).catch(() => {});
+    setIdx(0);
+    getCard(gid)
+      .then((c) => { if (live) setSrcs(c.images?.length ? c.images : c.image ? [c.image] : []); })
+      .catch(() => {});
     return () => { live = false; };
   }, [gid]);
+  const src = idx < srcs.length ? srcs[idx] : null;
   if (!src) {
     return <div style={{ position: "absolute", bottom: 12, left: 12, right: 12, color: "#fff", fontWeight: 700, fontSize: 14, lineHeight: 1.2, textShadow: "0 1px 4px rgba(0,0,0,.45)" }}>{name}</div>;
   }
-  return <img src={src} alt={name} loading="lazy" onError={() => setSrc(null)} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />;
+  return <img src={src} alt={name} loading="lazy" onError={() => setIdx((i) => i + 1)} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />;
 }

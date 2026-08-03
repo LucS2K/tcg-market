@@ -7,12 +7,12 @@ export default function CardDetail({ gid, openCard, goHome }) {
   const [card, setCard] = useState(null);
   const [related, setRelated] = useState([]);
   const [flipped, setFlipped] = useState(false);
-  const [imgOk, setImgOk] = useState(true);
+  const [imgIdx, setImgIdx] = useState(0);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     let live = true;
-    setCard(null); setRelated([]); setFlipped(false); setImgOk(true); setError(false);
+    setCard(null); setRelated([]); setFlipped(false); setImgIdx(0); setError(false);
     getCard(gid)
       .then((c) => {
         if (!live) return;
@@ -40,6 +40,10 @@ export default function CardDetail({ gid, openCard, goHome }) {
   }
 
   const g = GAMES[card.game];
+  // Candidate art, tried in order: own product photo, sibling printings,
+  // the base-name card (same illustration for most promo variants).
+  const artSrcs = card.images?.length ? card.images : card.image ? [card.image] : [];
+  const artSrc = imgIdx < artSrcs.length ? artSrcs[imgIdx] : null;
   const up = (card.change ?? 0) >= 0;
   const cs = changeStr(card.change);
   const spark = card.spark?.length ? card.spark : [card.price];
@@ -60,8 +64,8 @@ export default function CardDetail({ gid, openCard, goHome }) {
             <div style={{ position: "relative", aspectRatio: "5/7", transformStyle: "preserve-3d", transition: "transform .6s cubic-bezier(.4, .1, .2, 1.1)", transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}>
               <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden", borderRadius: 18, border: "2.5px solid #241a45", background: `linear-gradient(150deg, ${g.accent2}, ${g.accent})`, boxShadow: "8px 8px 0 #241a45", overflow: "hidden", display: "grid", placeItems: "center" }}>
                 <div style={{ fontSize: 130, color: "rgba(255,255,255,.32)" }}>{g.glyph}</div>
-                {card.image && imgOk ? (
-                  <img src={card.image} alt={card.name} onError={() => setImgOk(false)} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                {artSrc ? (
+                  <img src={artSrc} alt={card.name} onError={() => setImgIdx((i) => i + 1)} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
                   <>
                     <div style={{ position: "absolute", inset: 12, border: "2px solid rgba(255,255,255,.4)", borderRadius: 12, pointerEvents: "none" }} />

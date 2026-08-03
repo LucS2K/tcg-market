@@ -15,17 +15,22 @@ export function browseHash(game, set, page) {
 
 function TileArt({ gid, name, game }) {
   const g = GAMES[game];
-  const [src, setSrc] = useState(null);
+  const [srcs, setSrcs] = useState([]);
+  const [idx, setIdx] = useState(0);
   useEffect(() => {
     let live = true;
-    getCard(gid).then((c) => { if (live && c.image) setSrc(c.image); }).catch(() => {});
+    setIdx(0);
+    getCard(gid)
+      .then((c) => { if (live) setSrcs(c.images?.length ? c.images : c.image ? [c.image] : []); })
+      .catch(() => {});
     return () => { live = false; };
   }, [gid]);
+  const src = idx < srcs.length ? srcs[idx] : null;
   return (
     <div style={{ aspectRatio: "5/7", borderRadius: 12, border: "2px solid #241a45", background: `linear-gradient(150deg, ${g.accent2}, ${g.accent})`, position: "relative", overflow: "hidden", display: "grid", placeItems: "center" }}>
       <div style={{ fontSize: 64, color: "rgba(255,255,255,.35)" }}>{g.glyph}</div>
       {src ? (
-        <img src={src} alt={name} loading="lazy" onError={() => setSrc(null)} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        <img src={src} alt={name} loading="lazy" onError={() => setIdx((i) => i + 1)} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
       ) : (
         <div style={{ position: "absolute", bottom: 12, left: 12, right: 12, color: "#fff", fontWeight: 700, fontSize: 14, lineHeight: 1.2, textShadow: "0 1px 4px rgba(0,0,0,.45)" }}>{name}</div>
       )}
