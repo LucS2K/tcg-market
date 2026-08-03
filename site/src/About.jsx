@@ -17,7 +17,6 @@ export default function About({ goHome }) {
       <button className="lift-btn" onClick={goHome} style={{ fontSize: 14, fontWeight: 700, padding: "8px 16px", borderRadius: 999, border: "2px solid #241a45", background: "#fff", cursor: "pointer", boxShadow: "3px 3px 0 #241a45" }}>{COPY.backLabel}</button>
 
       <section style={{ padding: "36px 0 8px", animation: "rise .45s ease both" }}>
-        <div style={{ display: "inline-block", background: "#ffe36a", border: "2px solid #241a45", borderRadius: 999, padding: "5px 14px", fontWeight: 700, fontSize: 13, transform: "rotate(-2deg)", boxShadow: "3px 3px 0 #241a45" }}>a hobby, not a hedge fund</div>
         <h1 style={{ fontSize: "clamp(34px, 5vw, 56px)", fontWeight: 800, letterSpacing: "-1.5px", lineHeight: 1.05, margin: "16px 0 8px" }}>About this site</h1>
       </section>
 
