@@ -70,19 +70,15 @@ export default function About({ goHome }) {
         <section style={card}>
           <h2 style={h2}>About me</h2>
           <p style={p}>
-            Hi, I'm Luc, a business analyst. This one started at my card table: checking five
-            different sites to answer "what's this worth?" got old, so I built one place. It's also
-            my excuse to build a data pipeline end to end, done properly, because that's my idea of
-            fun too.
+            Hi, I'm Luc, a business analyst. This started because I wanted to build a fun project I
+            could share with friends and family — a one-stop shop for quick price checks when we rip
+            open packs, instead of bouncing between TCGplayer and PriceCharting.
           </p>
           <p style={p}>
             I did this end to end: choosing the games and sources, designing the daily collection
             and its rate-limit budgets, making the modeling and methodology decisions described on
             this page, and publishing the result. Implementation was AI-assisted (Claude Code); the
-            judgment calls documented above are mine. If you're a hiring team evaluating a business
-            analyst, my <a href="https://sf-inspections.vercel.app">SF health inspections project</a>{" "}
-            is the formal work sample — this is the one I built for fun, and the pipeline is real
-            either way.
+            judgment calls documented above are mine.
           </p>
           <p style={{ ...p, margin: 0 }}>
             <a href="https://www.linkedin.com/in/luchnguyen/">LinkedIn</a> ·{" "}
