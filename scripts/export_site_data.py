@@ -173,12 +173,12 @@ def main() -> None:
     def base_name(name: str) -> str:
         return re.sub(r"\s*\([^)]*\)", "", name or "").strip().lower()
 
-    name_image: dict[tuple, str] = {}
+    name_images: dict[tuple, list] = defaultdict(list)
     for rows_ in groups.values():
         for rec in rows_:
             key = (rec["game"], base_name(rec["name"]))
-            if rec["image_url"] and key not in name_image:
-                name_image[key] = rec["image_url"]
+            if rec["image_url"] and rec["image_url"] not in name_images[key]:
+                name_images[key].append(rec["image_url"])
 
     index_by_game: dict[str, list] = defaultdict(list)
     shards: dict[int, dict] = defaultdict(dict)
@@ -227,9 +227,9 @@ def main() -> None:
                 [u for u in (
                     head["image_url"],
                     *(p["image_url"] for p in printings),
-                    name_image.get((game, base_name(head["name"]))),
+                    *name_images.get((game, base_name(head["name"])), []),
                 ) if u]
-            ))[:4],
+            ))[:6],
             "artist": head["artist"],
             "blurb": blurb_for(game, head["name"], n_printings, price),
             "printings": [
